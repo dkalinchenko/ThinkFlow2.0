@@ -53,53 +53,36 @@ const logger = {
 
 // Initialize the application
 function initializeApp() {
-    logger.log('INIT', 'Application initialization started');
+    logger.log('INIT', 'Initializing application');
     
-    // Set debug mode based on URL parameter
-    window.debugMode = new URLSearchParams(window.location.search).has('debug');
+    // Define key elements for global access
+    elements = {
+        stepContainers: document.querySelectorAll('.step-container'),
+        stepIndicators: document.querySelectorAll('.step-indicator .step'),
+        forms: document.querySelectorAll('form')
+    };
     
-    // Try to load state from localStorage
+    // Load state from storage
     loadStateFromStorage();
     
-    // Set up form handlers
+    // Setup event handlers
     setupFormHandlers();
-    
-    // Set up step navigation
-    setupStepNavigation();
-    
-    // Set up save to account button
-    setupSaveToAccount();
-    
-    // Set initial decision ID if not already set
-    if (!state.decisionId) {
-        const nameForm = document.getElementById('nameForm');
-        if (nameForm) {
-            const hiddenId = nameForm.querySelector('input[name="id"]');
-            if (hiddenId) {
-                state.decisionId = hiddenId.value;
-                logger.log('INIT', 'Set initial decision ID from form', state.decisionId);
-            }
-        }
-    }
-    
-    // Initialize dynamic form elements
-    initializeDynamicForms();
-    
-    // Special handling for step 3 if we're already on it
-    if (state.currentStep === 3) {
-        prepareWeightFields(state.decision.criteria);
-    }
-    
-    // Special handling for step 5 if we're already on it
-    if (state.currentStep === 5) {
-        prepareEvaluationMatrix(state.decision.alternatives, state.decision.criteria);
-    }
-    
-    // Add event listeners to remove buttons
+    setupDynamicControls();
     setupRemoveButtons();
+    setupStepNavigation();
+    setupSaveToAccount();
+    setupDescriptionToggles();
     
-    // Log initial state
-    logger.state();
+    // If we have a saved decision, go to the saved step
+    if (state && state.currentStep) {
+        logger.log('INIT', `Restoring to step ${state.currentStep}`);
+        updateStep(state.currentStep);
+    } else {
+        // Otherwise start at step 1
+        updateStep(1);
+    }
+    
+    logger.log('INIT', 'Application initialization complete');
 }
 
 // Load state from localStorage
@@ -220,10 +203,32 @@ function setupDynamicControls() {
         newNewDecisionBtn.addEventListener('click', function() {
             logger.log('CLICK', 'New decision button clicked');
             if (confirm('Are you sure you want to start a new decision? All current data will be lost.')) {
-                window.location.href = '/';
+                resetState();
+                updateStep(1);
+                logger.log('DECISION', 'Started new decision');
             }
         });
     }
+    
+    // Set up description toggles for existing items
+    setupDescriptionToggles();
+}
+
+// Set up toggles for description fields
+function setupDescriptionToggles() {
+    logger.log('SETUP', 'Setting up description toggles');
+    
+    const toggleButtons = document.querySelectorAll('.toggle-description');
+    toggleButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const collapse = this.parentElement.previousElementSibling;
+            if (collapse) {
+                const isHidden = !collapse.classList.contains('show');
+                collapse.classList.toggle('show');
+                this.textContent = isHidden ? 'Hide description' : 'Add description';
+            }
+        });
+    });
 }
 
 // Initialize dynamic form elements
@@ -242,85 +247,99 @@ function initializeDynamicForms() {
 
 // Handle form submissions
 async function handleFormSubmit(form, step) {
+    logger.log('FORM', `Handling form submission for step ${step}`);
+    
     try {
-        logger.log('SUBMIT', `Handling form submission for step ${step}`, {
-            formId: form.id,
-            formAction: form.action,
-            formMethod: form.method
-        });
-        
-        // Ensure we have a decision ID
-        if (!state.decisionId) {
-            state.decisionId = Date.now().toString();
-        }
-
-        // Validate form
-        if (!form.checkValidity()) {
-            form.classList.add('was-validated');
-            return;
-        }
-
-        // Get form data
         const formData = new FormData(form);
-        let result = {};
-
-        // Process form data based on step
-        switch (step) {
-            case 1: // Name
-                result = {
-                    name: formData.get('name')
-                };
+        
+        // Update state based on form type
+        switch (form.id) {
+            case 'nameForm':
+                updateState({
+                    name: formData.get('name'),
+                    step: 2
+                });
                 break;
-
-            case 2: // Criteria
-                const criteriaInputs = form.querySelectorAll('input[name="criteria[]"]');
-                const criteria = Array.from(criteriaInputs).map(input => input.value.trim()).filter(Boolean);
-                if (criteria.length < 2) {
-                    showError('Please add at least two criteria');
-                    return;
-                }
-                result = { criteria };
+                
+            case 'criteriaForm':
+                const criteria = formData.getAll('criteria[]');
+                const criteriaDesc = formData.getAll('criteriaDesc[]');
+                
+                // Create descriptions object
+                const descriptions = {};
+                criteria.forEach((criterion, index) => {
+                    if (criteriaDesc[index]) {
+                        descriptions[criterion] = criteriaDesc[index];
+                    }
+                });
+                
+                updateState({
+                    criteria: criteria,
+                    criteriaDescriptions: descriptions,
+                    step: 3
+                });
+                
+                // Prepare weight fields for step 3
+                prepareWeightFields(criteria);
                 break;
-
-            case 3: // Weights
+                
+            case 'weightsForm':
                 const weights = {};
                 state.decision.criteria.forEach(criterion => {
                     const weight = formData.get(`weights[${criterion}]`);
-                    if (weight) {
-                        weights[criterion] = parseInt(weight, 10);
+                    weights[criterion] = parseFloat(weight) || 5;
+                });
+                
+                // Normalize weights
+                const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
+                state.decision.criteria.forEach(criterion => {
+                    weights[criterion] = weights[criterion] / totalWeight;
+                });
+                
+                updateState({
+                    weights: weights,
+                    step: 4
+                });
+                break;
+                
+            case 'alternativesForm':
+                const alternatives = formData.getAll('alternatives[]');
+                const alternativesDesc = formData.getAll('alternativesDesc[]');
+                
+                // Create descriptions object
+                const altDescriptions = {};
+                alternatives.forEach((alternative, index) => {
+                    if (alternativesDesc[index]) {
+                        altDescriptions[alternative] = alternativesDesc[index];
                     }
                 });
-                result = { weights };
+                
+                updateState({
+                    alternatives: alternatives,
+                    alternativeDescriptions: altDescriptions,
+                    step: 5
+                });
+                
+                // Prepare evaluation matrix for step 5
+                prepareEvaluationMatrix(alternatives, state.decision.criteria);
                 break;
-
-            case 4: // Alternatives
-                const alternativeInputs = form.querySelectorAll('input[name="alternatives[]"]');
-                const alternatives = Array.from(alternativeInputs).map(input => input.value.trim()).filter(Boolean);
-                if (alternatives.length < 2) {
-                    showError('Please add at least two alternatives');
-                    return;
-                }
-                result = { alternatives };
+                
+            case 'evaluationForm':
+                // This is now handled by calculateButtonHandler
                 break;
+                
+            default:
+                logger.error('FORM', `Unknown form id: ${form.id}`);
         }
-
-        // Update state with form data
-        updateState(result);
-
-        // Save state to storage
-        saveStateToStorage();
-
-        // Move to next step
+        
+        // Update UI to show next step
         updateStep(step + 1);
-
-        // Reset form validation state
-        form.classList.remove('was-validated');
-
-        logger.log('SUBMIT', 'Form submission successful', { step, result });
+        
+        logger.log('FORM', `Form submission for step ${step} completed successfully`);
         return true;
     } catch (error) {
-        logger.error('SUBMIT', 'Error handling form submission', error);
-        showError('An error occurred while processing your submission. Please try again.');
+        logger.error('FORM', `Error handling form submission for step ${step}:`, error);
+        showError('Error saving your data. Please try again.');
         return false;
     }
 }
@@ -569,88 +588,96 @@ function prepareWeightFields(criteria) {
 
 // Add a new criteria field
 function addCriteriaField(event) {
-    if (event) {
-        event.preventDefault();
-    }
-    
-    logger.log('ACTION', 'Adding a single criteria field');
+    logger.log('CRITERIA', 'Adding new criteria field');
+    event.preventDefault();
     
     const criteriaList = document.getElementById('criteriaList');
     if (!criteriaList) {
-        logger.error('Could not find criteriaList element');
+        logger.error('CRITERIA', 'Criteria list container not found');
         return;
     }
     
     const newItem = document.createElement('div');
-    newItem.className = 'form-group mb-2 criteria-item';
-    
+    newItem.className = 'criteria-item';
     newItem.innerHTML = `
-        <div class="input-group">
-            <input type="text" name="criteria[]" class="form-control" placeholder="Enter criteria" required>
-            <button type="button" class="btn btn-danger remove-criteria">
-                <i class="fas fa-times"></i>
-            </button>
+        <div class="input-group mb-2">
+            <input type="text" class="form-control" name="criteria[]" placeholder="Enter criterion" required>
+            <button type="button" class="btn btn-outline-danger remove-btn">Remove</button>
+        </div>
+        <div class="collapse mt-2 mb-3">
+            <textarea class="form-control" name="criteriaDesc[]" placeholder="Optional description for this criterion" rows="2"></textarea>
+        </div>
+        <div class="text-end">
+            <button type="button" class="btn btn-sm btn-link toggle-description">Add description</button>
         </div>
     `;
     
     criteriaList.appendChild(newItem);
     
-    // Add event listener to the remove button
-    const removeButton = newItem.querySelector('.remove-criteria');
-    if (removeButton) {
-        removeButton.addEventListener('click', function() {
-            criteriaList.removeChild(newItem);
+    // Re-attach remove button handler
+    setupRemoveButtons();
+    
+    // Set up toggle for description field
+    const toggleButton = newItem.querySelector('.toggle-description');
+    if (toggleButton) {
+        toggleButton.addEventListener('click', function() {
+            const collapse = this.parentElement.previousElementSibling;
+            if (collapse) {
+                const isHidden = !collapse.classList.contains('show');
+                collapse.classList.toggle('show');
+                this.textContent = isHidden ? 'Hide description' : 'Add description';
+            }
         });
     }
     
-    // Focus the new input field
-    const input = newItem.querySelector('input');
-    if (input) {
-        input.focus();
-    }
+    logger.log('CRITERIA', 'New criteria field added');
 }
 
 // Add a new alternative field
 function addAlternativeField(event) {
-    if (event) {
-        event.preventDefault();
-    }
-    
-    logger.log('ACTION', 'Adding a single alternative field');
+    logger.log('ALTERNATIVES', 'Adding new alternative field');
+    event.preventDefault();
     
     const alternativesList = document.getElementById('alternativesList');
     if (!alternativesList) {
-        logger.error('Could not find alternativesList element');
+        logger.error('ALTERNATIVES', 'Alternatives list container not found');
         return;
     }
     
     const newItem = document.createElement('div');
-    newItem.className = 'form-group mb-2 alternative-item';
-    
+    newItem.className = 'alternative-item';
     newItem.innerHTML = `
-        <div class="input-group">
-            <input type="text" name="alternatives[]" class="form-control" placeholder="Enter alternative" required>
-            <button type="button" class="btn btn-danger remove-alternative">
-                <i class="fas fa-times"></i>
-            </button>
+        <div class="input-group mb-2">
+            <input type="text" class="form-control" name="alternatives[]" placeholder="Enter alternative" required>
+            <button type="button" class="btn btn-outline-danger remove-btn">Remove</button>
+        </div>
+        <div class="collapse mt-2 mb-3">
+            <textarea class="form-control" name="alternativesDesc[]" placeholder="Optional description for this alternative" rows="2"></textarea>
+        </div>
+        <div class="text-end">
+            <button type="button" class="btn btn-sm btn-link toggle-description">Add description</button>
         </div>
     `;
     
     alternativesList.appendChild(newItem);
     
-    // Add event listener to the remove button
-    const removeButton = newItem.querySelector('.remove-alternative');
-    if (removeButton) {
-        removeButton.addEventListener('click', function() {
-            alternativesList.removeChild(newItem);
+    // Re-attach remove button handler
+    setupRemoveButtons();
+    
+    // Set up toggle for description field
+    const toggleButton = newItem.querySelector('.toggle-description');
+    if (toggleButton) {
+        toggleButton.addEventListener('click', function() {
+            const collapse = this.parentElement.previousElementSibling;
+            if (collapse) {
+                const isHidden = !collapse.classList.contains('show');
+                collapse.classList.toggle('show');
+                this.textContent = isHidden ? 'Hide description' : 'Add description';
+            }
         });
     }
     
-    // Focus the new input field
-    const input = newItem.querySelector('input');
-    if (input) {
-        input.focus();
-    }
+    logger.log('ALTERNATIVES', 'New alternative field added');
 }
 
 // Show results
@@ -1304,7 +1331,7 @@ function displayResults(results) {
             alternativeCell.textContent = alternative;
             
             const scoreCell = document.createElement('td');
-            const percentage = results[alternative].percentage.toFixed(1);
+            const percentage = (results[alternative].score * 100).toFixed(1);
             scoreCell.textContent = `${percentage}%`;
             
             const rankCell = document.createElement('td');
@@ -1324,7 +1351,7 @@ function displayResults(results) {
         const resultsSummary = document.getElementById('resultsSummary');
         if (resultsSummary) {
             const bestAlternative = sortedAlternatives[0];
-            const bestScore = results[bestAlternative].percentage.toFixed(1);
+            const bestScore = (results[bestAlternative].score * 100).toFixed(1);
             
             resultsSummary.innerHTML = `
                 <div class="alert alert-success">
@@ -1334,14 +1361,40 @@ function displayResults(results) {
             `;
         }
         
-        // Ensure criteria weights section is visible
-        const criteriaWeightsSection = document.getElementById('criteriaWeights');
-        if (criteriaWeightsSection) {
-            criteriaWeightsSection.style.display = 'block';
+        // Populate criteria weights list
+        const criteriaWeightsList = document.getElementById('criteria-weights-list');
+        if (criteriaWeightsList) {
+            criteriaWeightsList.innerHTML = '';
+            
+            state.decision.criteria.forEach(criterion => {
+                const weight = state.decision.weights[criterion];
+                const percentage = weight ? (weight * 100).toFixed(0) + '%' : 'N/A';
+                
+                const item = document.createElement('li');
+                item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                item.innerHTML = `
+                    ${criterion}
+                    <span class="badge bg-primary rounded-pill">${percentage}</span>
+                `;
+                criteriaWeightsList.appendChild(item);
+            });
         }
         
-        // Smooth scroll to results section
-        goToStep(6);
+        // Populate alternatives list
+        const alternativesList = document.getElementById('alternatives-list');
+        if (alternativesList) {
+            alternativesList.innerHTML = '';
+            
+            state.decision.alternatives.forEach(alternative => {
+                const item = document.createElement('li');
+                item.className = 'list-group-item';
+                item.textContent = alternative;
+                alternativesList.appendChild(item);
+            });
+        }
+        
+        // Set up dynamic weight adjustment sliders
+        setupDynamicWeights(state.decision.criteria, state.decision.weights);
         
         logger.log('RESULTS', 'Results display completed successfully');
     } catch (error) {

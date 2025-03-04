@@ -73,6 +73,12 @@
                                     <input type="text" class="form-control" name="criteria[]" placeholder="Enter criterion" required>
                                     <button type="button" class="btn btn-outline-danger remove-btn">Remove</button>
                                 </div>
+                                <div class="collapse mt-2 mb-3">
+                                    <textarea class="form-control" name="criteriaDesc[]" placeholder="Optional description for this criterion" rows="2"></textarea>
+                                </div>
+                                <div class="text-end">
+                                    <button type="button" class="btn btn-sm btn-link toggle-description">Add description</button>
+                                </div>
                             </div>
                         </div>
                         <button type="button" class="btn btn-secondary mb-3" id="addCriteriaBtn">Add Another Criterion</button>
@@ -134,6 +140,12 @@
                                     <input type="text" class="form-control" name="alternatives[]" placeholder="Enter alternative" required>
                                     <button type="button" class="btn btn-outline-danger remove-btn">Remove</button>
                                 </div>
+                                <div class="collapse mt-2 mb-3">
+                                    <textarea class="form-control" name="alternativesDesc[]" placeholder="Optional description for this alternative" rows="2"></textarea>
+                                </div>
+                                <div class="text-end">
+                                    <button type="button" class="btn btn-sm btn-link toggle-description">Add description</button>
+                                </div>
                             </div>
                         </div>
                         <button type="button" class="btn btn-secondary mb-3" id="addAlternativeBtn">Add Another Alternative</button>
@@ -177,6 +189,10 @@
                             <h3 class="card-title mb-0">Decision: <span id="resultDecisionName"></span></h3>
                         </div>
                         <div class="card-body">
+                            <div id="resultsSummary" class="mb-4">
+                                <!-- Results summary will be populated here -->
+                            </div>
+                            
                             <div id="resultsChartContainer" class="results-chart" style="height: 300px;">
                                 <canvas id="resultsChart"></canvas>
                             </div>
@@ -208,7 +224,7 @@
                             <p class="text-muted mb-0">Adjust the importance of each criterion to see how it affects the results.</p>
                         </div>
                         <div class="card-body">
-                            <div id="dynamic-weights-container">
+                            <div id="weightSliders">
                                 <!-- Dynamic weight sliders will be populated here -->
                             </div>
                         </div>
@@ -254,7 +270,7 @@
                         </div>
                     <% } %>
                     
-                    <button id="start-new-btn" class="btn btn-primary btn-lg ms-2">
+                    <button id="newDecisionBtn" class="btn btn-primary btn-lg ms-2">
                         <i class="fas fa-plus me-2"></i> Start New Decision
                     </button>
                 </div>
