@@ -176,21 +176,18 @@ function setupDynamicControls() {
     // Add fresh event listeners
     if (newAddCriteriaBtn) {
         newAddCriteriaBtn.addEventListener('click', function(event) {
-            logger.log('CLICK', 'Add criteria button clicked');
             addCriteriaField(event);
         });
     }
     
     if (newAddAlternativeBtn) {
         newAddAlternativeBtn.addEventListener('click', function(event) {
-            logger.log('CLICK', 'Add alternative button clicked');
             addAlternativeField(event);
         });
     }
     
     if (newNewDecisionBtn) {
         newNewDecisionBtn.addEventListener('click', function() {
-            logger.log('CLICK', 'New decision button clicked');
             if (confirm('Are you sure you want to start a new decision? All current data will be lost.')) {
                 window.location.href = '/';
             }
@@ -215,12 +212,6 @@ function initializeDynamicForms() {
 // Handle form submissions
 async function handleFormSubmit(form, step) {
     try {
-        logger.log('SUBMIT', `Handling form submission for step ${step}`, {
-            formId: form.id,
-            formAction: form.action,
-            formMethod: form.method
-        });
-        
         // Ensure we have a decision ID
         if (!state.decisionId) {
             state.decisionId = Date.now().toString();
@@ -229,12 +220,6 @@ async function handleFormSubmit(form, step) {
         const data = {
             id: state.decisionId
         };
-        
-        logger.log('SUBMIT', 'Current state before processing:', {
-            currentStep: state.currentStep,
-            decisionId: state.decisionId,
-            decision: state.decision
-        });
 
         // Process form data based on step
         switch (step) {
@@ -317,11 +302,6 @@ async function handleFormSubmit(form, step) {
 
         // Save state to localStorage before sending to server
         saveStateToStorage();
-
-        logger.log('SUBMIT', 'Sending data to server', {
-            step, 
-            data
-        });
         
         // Send data to server
         const response = await fetch('/save-step', {
@@ -335,12 +315,10 @@ async function handleFormSubmit(form, step) {
 
         if (!response.ok) {
             const errorText = await response.text();
-            logger.error('SUBMIT', `Server returned status ${response.status}`, errorText);
             throw new Error(`Server error: ${errorText}`);
         }
 
         const result = await response.json();
-        logger.log('SUBMIT', 'Server response', result);
         
         if (result.success) {
             // Update state with server response
@@ -350,46 +328,26 @@ async function handleFormSubmit(form, step) {
             saveStateToStorage();
             
             if (step === 5) {
-                logger.log('SUBMIT', 'Processing step 5 response');
                 // Make sure we have results
                 if (result.results) {
-                    logger.log('RESULTS', 'Results received from server', result.results);
-                    
                     // Validate results structure
                     if (typeof result.results !== 'object' || Object.keys(result.results).length === 0) {
-                        logger.error('RESULTS', 'Invalid results format', result.results);
-                        showError('Invalid results format. Please try again.');
-                        return;
+                        throw new Error('Invalid results format. Please try again.');
                     }
                     
-                    // Check if any alternatives are missing from results
-                    const missingAlternatives = state.decision.alternatives.filter(
-                        alt => !Object.keys(result.results).includes(alt)
-                    );
-                    
-                    if (missingAlternatives.length > 0) {
-                        logger.error('RESULTS', 'Missing alternatives in results', missingAlternatives);
-                        showError(`Missing results for alternatives: ${missingAlternatives.join(', ')}. Please try again.`);
-                        return;
-                    }
-                    
-                    logger.log('RESULTS', 'Showing results', result.results);
                     await showResults(result.results, state.decision);
                     updateStep(6);
                 } else {
-                    logger.error('RESULTS', 'No results in response', result);
-                    showError('No results were returned. Please try again.');
+                    throw new Error('No results were returned. Please try again.');
                 }
             } else {
                 // Handle special case for step 3 (weights)
                 if (result.nextStep === 3) {
-                    logger.log('TRANSITION', 'Preparing weight form for step 3');
                     prepareWeightFields(state.decision.criteria);
                 }
                 
                 // Handle special case for step 5 (evaluation matrix)
                 if (result.nextStep === 5) {
-                    logger.log('TRANSITION', 'Preparing evaluation matrix for step 5');
                     prepareEvaluationMatrix(state.decision.alternatives, state.decision.criteria);
                 }
                 
@@ -397,19 +355,15 @@ async function handleFormSubmit(form, step) {
                 updateStep(result.nextStep);
             }
         } else {
-            logger.error('SUBMIT', 'Error response from server', result);
-            showError(result.error || 'An error occurred');
+            throw new Error(result.error || 'An error occurred');
         }
     } catch (error) {
-        logger.error('SUBMIT', 'Error submitting form', error);
-        showError('An error occurred. Please try again.');
+        throw error;
     }
 }
 
 // Update application state with server response
 function updateState(result) {
-    logger.log('STATE', 'Updating state with server response');
-    
     if (result.currentId) {
         state.decisionId = result.currentId;
     }
@@ -435,31 +389,23 @@ function updateState(result) {
     if (result.nextStep) {
         state.currentStep = result.nextStep;
     }
-    
-    logger.state();
 }
 
 // Update UI to show the specified step
 function updateStep(newStep) {
-    logger.log('UI', `Updating to step ${newStep}`);
-
     // Update step containers
     const allStepContainers = document.querySelectorAll('.step-container');
-    logger.log('UI', `Found ${allStepContainers.length} step containers`);
     
     allStepContainers.forEach(container => {
         container.classList.remove('active');
-        logger.log('UI', `Removed active class from container: ${container.id}`);
     });
     
     const nextStepContainer = document.querySelector(`#step${newStep}`);
     if (!nextStepContainer) {
-        logger.error('UI', `Could not find container for step ${newStep}`);
         showError('Could not find the next step container. Please try reloading the page.');
         return;
     }
     
-    logger.log('UI', `Activating step container: ${nextStepContainer.id}`);
     nextStepContainer.classList.add('active');
 
     // Update step indicators
@@ -468,39 +414,31 @@ function updateStep(newStep) {
         const step = stepLink.querySelector('.step');
         if (index + 1 <= newStep) {
             step.classList.add('active');
-            logger.log('UI', `Activated step indicator ${index + 1}`);
         } else {
             step.classList.remove('active');
-            logger.log('UI', `Deactivated step indicator ${index + 1}`);
         }
     });
 
     // Update current step in state
     state.currentStep = newStep;
     saveStateToStorage();
-    logger.log('UI', `Updated state.currentStep to ${newStep}`);
     
     // Special handling for step 5
     if (newStep === 5) {
-        logger.log('UI', 'Preparing evaluation matrix for step 5');
         prepareEvaluationMatrix(state.decision.alternatives, state.decision.criteria);
     }
 }
 
 // Prepare weight fields for step 3
 function prepareWeightFields(criteria) {
-    logger.log('WEIGHTS', 'Preparing weight fields for criteria', criteria);
-    
     // Check if criteria exist
     if (!criteria || !Array.isArray(criteria) || criteria.length === 0) {
-        logger.error('WEIGHTS', 'No criteria available to create weight fields');
         return false;
     }
     
     // Get the weights form container
     const weightsFormContainer = document.getElementById('step3');
     if (!weightsFormContainer) {
-        logger.error('WEIGHTS', 'Could not find step3 container');
         return false;
     }
     
@@ -526,14 +464,14 @@ function prepareWeightFields(criteria) {
         explanation.textContent = 'How important is each criterion? Slide to set importance (1-10)';
         form.appendChild(explanation);
         
-            // Create fields container
-            const fieldsContainer = document.createElement('div');
-            fieldsContainer.className = 'weight-fields-container';
-            form.appendChild(fieldsContainer);
-            
-            // Create weight fields for each criterion
-            criteria.forEach(criterion => {
-                const field = document.createElement('div');
+        // Create fields container
+        const fieldsContainer = document.createElement('div');
+        fieldsContainer.className = 'weight-fields-container';
+        form.appendChild(fieldsContainer);
+        
+        // Create weight fields for each criterion
+        criteria.forEach(criterion => {
+            const field = document.createElement('div');
             field.className = 'mb-4 weight-field';
             
             const labelContainer = document.createElement('div');
@@ -586,26 +524,24 @@ function prepareWeightFields(criteria) {
             field.appendChild(labelContainer);
             field.appendChild(sliderContainer);
             field.appendChild(tickMarks);
-                fieldsContainer.appendChild(field);
-            });
-            
-            // Add submit button
-            const submitBtn = document.createElement('button');
-            submitBtn.type = 'submit';
+            fieldsContainer.appendChild(field);
+        });
+        
+        // Add submit button
+        const submitBtn = document.createElement('button');
+        submitBtn.type = 'submit';
         submitBtn.className = 'btn btn-primary mt-3';
-            submitBtn.textContent = 'Continue to Step 4';
-            form.appendChild(submitBtn);
-            
-            // Attach submit event listener
-            form.addEventListener('submit', async (event) => {
-                event.preventDefault();
-                await handleFormSubmit(form, 3);
-            });
-            
-        logger.log('WEIGHTS', 'Successfully created weight fields with sliders');
-            return true;
+        submitBtn.textContent = 'Continue to Step 4';
+        form.appendChild(submitBtn);
+        
+        // Attach submit event listener
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            await handleFormSubmit(form, 3);
+        });
+        
+        return true;
     } catch (error) {
-        logger.error('WEIGHTS', 'Error creating weight fields', error);
         weightsFormContainer.innerHTML = `
             <div class="alert alert-danger">
                 <h4>Error Creating Form</h4>
@@ -623,11 +559,8 @@ function addCriteriaField(event) {
         event.preventDefault();
     }
     
-    logger.log('ACTION', 'Adding a single criteria field');
-    
     const criteriaList = document.getElementById('criteriaList');
     if (!criteriaList) {
-        logger.error('Could not find criteriaList element');
         return;
     }
     
@@ -666,11 +599,8 @@ function addAlternativeField(event) {
         event.preventDefault();
     }
     
-    logger.log('ACTION', 'Adding a single alternative field');
-    
     const alternativesList = document.getElementById('alternativesList');
     if (!alternativesList) {
-        logger.error('Could not find alternativesList element');
         return;
     }
     
@@ -706,18 +636,14 @@ function addAlternativeField(event) {
 // Show results
 async function showResults(results, currentState) {
     try {
-        logger.log('RESULTS_DISPLAY', 'Processing results for display', results);
-        
         // Validate results and current state
         if (!results || typeof results !== 'object') {
-            logger.error('RESULTS_DISPLAY', 'Invalid results object', results);
             showError('Invalid results data structure');
             return;
         }
         
         if (!currentState || !currentState.name || !Array.isArray(currentState.alternatives) || 
             !Array.isArray(currentState.criteria) || !currentState.weights) {
-            logger.error('RESULTS_DISPLAY', 'Invalid current state', currentState);
             showError('Invalid decision state data');
             return;
         }
@@ -729,8 +655,6 @@ async function showResults(results, currentState) {
                 score: typeof score === 'number' ? parseFloat(score.toFixed(2)) : 0
             };
         }).sort((a, b) => b.score - a.score);
-        
-        logger.log('RESULTS_DISPLAY', 'Formatted results', formattedResults);
 
         // Display decision name
         const decisionNameDisplay = document.getElementById('decision-name-display');
@@ -741,7 +665,6 @@ async function showResults(results, currentState) {
         // Populate results table
         const resultsTableBody = document.querySelector('#results-table tbody');
         if (!resultsTableBody) {
-            logger.error('RESULTS_DISPLAY', 'Results table body element not found');
             showError('UI element not found: results table');
             return;
         }
@@ -787,14 +710,13 @@ async function showResults(results, currentState) {
                 alternativesList.appendChild(li);
             });
         } else {
-            logger.warn('RESULTS_DISPLAY', 'Alternatives list element not found');
+            showError('UI element not found: alternatives list');
         }
     
     // Create chart
         try {
             await createResultsChart(formattedResults);
         } catch (chartError) {
-            logger.error('RESULTS_DISPLAY', 'Error creating chart', chartError);
             // Don't fail the whole results display if just the chart fails
         }
         
@@ -810,12 +732,6 @@ async function showResults(results, currentState) {
                     if (!state.decisionId) {
                         throw new Error('Decision ID is missing');
                     }
-
-                    logger.log('SAVE', 'Saving decision to account', {
-                        decisionId: state.decisionId,
-                        name: currentState.name,
-                        state: state
-                    });
 
                     const saveData = {
                         decisionId: state.decisionId,
@@ -842,7 +758,6 @@ async function showResults(results, currentState) {
                         throw new Error(result.error || 'Failed to save decision');
                     }
                 } catch (error) {
-                    logger.error('SAVE', 'Error saving decision', error);
                     showError('Error saving decision: ' + error.message);
                 }
             });
@@ -859,51 +774,39 @@ async function showResults(results, currentState) {
             });
         }
     } catch (error) {
-        logger.error('RESULTS_DISPLAY', 'Error displaying results', error);
         showError('Error displaying results: ' + error.message);
     }
 }
 
 // Create results chart
 function createResultsChart(formattedResults) {
-    logger.log('CHART', 'Starting chart creation', formattedResults);
-    
     return new Promise((resolve, reject) => {
         // First check if Chart is defined
         if (typeof Chart === 'undefined') {
-            const error = new Error('Chart.js is not loaded');
-            logger.error('CHART', 'Chart.js not found', error);
-            reject(error);
+            reject(new Error('Chart.js is not loaded'));
             return;
         }
 
         if (!Array.isArray(formattedResults) || formattedResults.length === 0) {
-            const error = new Error('Invalid or empty results for chart');
-            logger.error('CHART', 'Invalid data for chart creation', error);
-            reject(error);
+            reject(new Error('Invalid or empty results for chart'));
             return;
         }
         
         const chartCanvas = document.getElementById('resultsChart');
         if (!chartCanvas) {
-            const error = new Error('Chart canvas element not found');
-            logger.error('CHART', 'Canvas element not found', error);
-            reject(error);
+            reject(new Error('Chart canvas element not found'));
             return;
         }
         
         try {
             // Check if there's an existing chart and destroy it
             if (window.resultsChart instanceof Chart) {
-                logger.log('CHART', 'Destroying existing chart');
                 window.resultsChart.destroy();
             }
             
             // Prepare data for chart
             const labels = formattedResults.map(result => result.alternative);
             const data = formattedResults.map(result => result.score);
-            
-            logger.log('CHART', 'Chart data prepared', { labels, data });
             
             // Define colors with opacity
             const backgroundColors = [
@@ -955,11 +858,9 @@ function createResultsChart(formattedResults) {
                 }
             });
             
-            logger.log('CHART', 'Chart created successfully');
             resolve(window.resultsChart);
             
         } catch (error) {
-            logger.error('CHART', 'Error creating chart', error);
             reject(error);
         }
     });
@@ -976,17 +877,13 @@ function showError(message) {
 
 // Prepare evaluation matrix for step 5
 function prepareEvaluationMatrix(alternatives, criteria) {
-    logger.log('EVALUATION', 'Preparing evaluation matrix', { alternatives, criteria });
-    
     // Check if alternatives and criteria exist
     if (!alternatives || !Array.isArray(alternatives) || alternatives.length === 0) {
-        logger.error('EVALUATION', 'No alternatives available to create evaluation matrix');
         showError('No alternatives available. Please complete step 4 first.');
         return false;
     }
     
     if (!criteria || !Array.isArray(criteria) || criteria.length === 0) {
-        logger.error('EVALUATION', 'No criteria available to create evaluation matrix');
         showError('No criteria available. Please complete step 2 first.');
         return false;
     }
@@ -994,7 +891,6 @@ function prepareEvaluationMatrix(alternatives, criteria) {
     // Get the evaluation matrix container
     const evaluationMatrix = document.getElementById('evaluationMatrix');
     if (!evaluationMatrix) {
-        logger.error('EVALUATION', 'Could not find evaluationMatrix container');
         showError('Could not find evaluation matrix container. Please try reloading the page.');
         return false;
     }
@@ -1050,7 +946,6 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 // Update value display when slider moves
                 input.addEventListener('input', function() {
                     valueDisplay.textContent = this.value;
-                    logger.log('EVALUATION', `Slider value changed: ${alternative}/${criterion} = ${this.value}`);
                 });
                 
                 sliderContainer.appendChild(input);
@@ -1069,8 +964,6 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 field.appendChild(sliderContainer);
                 field.appendChild(tickMarks);
                 evaluationMatrix.appendChild(field);
-                
-                logger.log('EVALUATION', `Created evaluation field for ${alternative}/${criterion}`);
             });
             
             // Add divider after each alternative except the last one
@@ -1084,12 +977,9 @@ function prepareEvaluationMatrix(alternatives, criteria) {
         // Make sure the form has a submit handler
         const evaluationForm = document.getElementById('evaluationForm');
         if (!evaluationForm) {
-            logger.error('EVALUATION', 'Could not find evaluation form element');
             showError('Could not find evaluation form. Please try reloading the page.');
             return false;
         }
-        
-        logger.log('EVALUATION', 'Found evaluation form, setting up submit handler');
         
         // Remove any existing event listeners by cloning the form
         const newForm = evaluationForm.cloneNode(true);
@@ -1103,14 +993,12 @@ function prepareEvaluationMatrix(alternatives, criteria) {
             calculateButton.className = 'btn btn-primary mt-4';
             calculateButton.textContent = 'Calculate Results';
             newForm.appendChild(calculateButton);
-            logger.log('EVALUATION', 'Added Calculate Results button to form');
         }
         
         // Add click handler to the Calculate Results button
         calculateButton.onclick = async function(event) {
             event.preventDefault();
             event.stopPropagation();
-            logger.log('EVALUATION', 'Calculate Results button clicked');
             
             // Collect all evaluation data
             const evaluations = {};
@@ -1122,18 +1010,15 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                     const inputId = `eval-${alternative}-${criterion}`;
                     const input = document.getElementById(inputId);
                     if (!input) {
-                        logger.error('EVALUATION', `Missing input field: ${inputId}`);
                         isValid = false;
                         return;
                     }
                     const value = input.value;
                     if (!value || isNaN(parseInt(value))) {
-                        logger.error('EVALUATION', `Invalid value for ${alternative}/${criterion}: ${value}`);
                         isValid = false;
                         return;
                     }
                     evaluations[alternative][criterion] = parseInt(value);
-                    logger.log('EVALUATION', `Collected value for ${alternative}/${criterion}: ${value}`);
                 });
             });
             
@@ -1142,28 +1027,20 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 return;
             }
             
-            logger.log('EVALUATION', 'All evaluations collected:', evaluations);
-            
             // Update state before submitting
             state.decision.evaluations = evaluations;
             saveStateToStorage();
             
-            logger.log('EVALUATION', 'Updated state with evaluations, submitting form');
-            
             try {
                 await handleFormSubmit(newForm, 5);
-                logger.log('EVALUATION', 'Form submission completed');
             } catch (error) {
-                logger.error('EVALUATION', 'Error submitting form:', error);
                 showError('Error submitting evaluations: ' + error.message);
             }
         };
         
-        logger.log('EVALUATION', 'Submit handler attached successfully');
         return true;
         
     } catch (error) {
-        logger.error('EVALUATION', 'Error creating evaluation matrix', error);
         evaluationMatrix.innerHTML = `
             <div class="alert alert-danger">
                 <h4>Error Creating Evaluation Matrix</h4>
