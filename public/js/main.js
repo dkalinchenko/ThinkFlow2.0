@@ -150,13 +150,38 @@ function setupFormHandlers() {
             // Add the event listener
             newForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
-                await handleFormSubmit(newForm, index + 1);
+                event.stopPropagation();
+                
+                // Validate form
+                newForm.classList.add('was-validated');
+                
+                // Only proceed if form is valid
+                if (newForm.checkValidity()) {
+                    await handleFormSubmit(newForm, index + 1);
+                } else {
+                    logger.log('FORM', `Form validation failed for ${formId}`);
+                }
             });
+            
+            // Add input validation listeners
+            const inputs = newForm.querySelectorAll('input[required]');
+            inputs.forEach(input => {
+                input.addEventListener('input', () => {
+                    if (input.checkValidity()) {
+                        input.classList.remove('is-invalid');
+                        input.classList.add('is-valid');
+                    } else {
+                        input.classList.remove('is-valid');
+                        input.classList.add('is-invalid');
+                    }
+                });
+            });
+        } else {
+            logger.error('SETUP', `Form with id ${formId} not found`);
         }
     });
 
-    // Set up dynamic controls
-    setupDynamicControls();
+    logger.log('SETUP', 'Form handlers setup complete');
 }
 
 // Helper function to replace a button with its clone to remove event listeners
@@ -250,13 +275,27 @@ async function handleFormSubmit(form, step) {
     logger.log('FORM', `Handling form submission for step ${step}`);
     
     try {
+        // Validate form
+        if (!form.checkValidity()) {
+            logger.log('FORM', 'Form validation failed');
+            form.classList.add('was-validated');
+            return false;
+        }
+        
         const formData = new FormData(form);
         
         // Update state based on form type
         switch (form.id) {
             case 'nameForm':
+                const name = formData.get('name');
+                if (!name || name.trim() === '') {
+                    logger.error('FORM', 'Name is required');
+                    form.classList.add('was-validated');
+                    return false;
+                }
+                
                 updateState({
-                    name: formData.get('name'),
+                    name: name,
                     step: 2
                 });
                 break;
@@ -264,6 +303,12 @@ async function handleFormSubmit(form, step) {
             case 'criteriaForm':
                 const criteria = formData.getAll('criteria[]');
                 const criteriaDesc = formData.getAll('criteriaDesc[]');
+                
+                if (criteria.length < 2) {
+                    logger.error('FORM', 'At least 2 criteria are required');
+                    showError('Please add at least 2 criteria for your decision.');
+                    return false;
+                }
                 
                 // Create descriptions object
                 const descriptions = {};
@@ -306,6 +351,12 @@ async function handleFormSubmit(form, step) {
                 const alternatives = formData.getAll('alternatives[]');
                 const alternativesDesc = formData.getAll('alternativesDesc[]');
                 
+                if (alternatives.length < 2) {
+                    logger.error('FORM', 'At least 2 alternatives are required');
+                    showError('Please add at least 2 alternatives for your decision.');
+                    return false;
+                }
+                
                 // Create descriptions object
                 const altDescriptions = {};
                 alternatives.forEach((alternative, index) => {
@@ -330,10 +381,17 @@ async function handleFormSubmit(form, step) {
                 
             default:
                 logger.error('FORM', `Unknown form id: ${form.id}`);
+                return false;
         }
+        
+        // Save state to storage
+        saveStateToStorage();
         
         // Update UI to show next step
         updateStep(step + 1);
+        
+        // Reset form validation state
+        form.classList.remove('was-validated');
         
         logger.log('FORM', `Form submission for step ${step} completed successfully`);
         return true;
@@ -348,11 +406,10 @@ async function handleFormSubmit(form, step) {
 function updateState(result) {
     logger.log('STATE', 'Updating state with result', result);
 
-    // Update state based on result properties
-    if (result.name) {
-        // Step 1: Update name and initialize decision
+    // Initialize state if needed
+    if (!state.decision) {
         state.decision = {
-            name: result.name,
+            name: '',
             criteria: [],
             weights: {},
             alternatives: [],
@@ -361,13 +418,32 @@ function updateState(result) {
         };
     }
 
+    // Update state based on result properties
+    if (result.name) {
+        // Step 1: Update name
+        state.decision.name = result.name;
+    }
+
     if (result.criteria) {
         // Step 2: Update criteria and initialize weights
         state.decision.criteria = [...result.criteria];
-        state.decision.weights = {};
+        
+        // Initialize weights if needed
+        if (!state.decision.weights) {
+            state.decision.weights = {};
+        }
+        
+        // Set default weights for new criteria
         result.criteria.forEach(criterion => {
-            state.decision.weights[criterion] = 5; // Default weight
+            if (!state.decision.weights[criterion]) {
+                state.decision.weights[criterion] = 1 / result.criteria.length;
+            }
         });
+        
+        // Store criteria descriptions if provided
+        if (result.criteriaDescriptions) {
+            state.decision.criteriaDescriptions = { ...result.criteriaDescriptions };
+        }
     }
 
     if (result.weights) {
@@ -378,13 +454,30 @@ function updateState(result) {
     if (result.alternatives) {
         // Step 4: Update alternatives and initialize evaluations
         state.decision.alternatives = [...result.alternatives];
-        state.decision.evaluations = {};
+        
+        // Initialize evaluations if needed
+        if (!state.decision.evaluations) {
+            state.decision.evaluations = {};
+        }
+        
+        // Initialize evaluations for new alternatives
         result.alternatives.forEach(alternative => {
-            state.decision.evaluations[alternative] = {};
-            state.decision.criteria.forEach(criterion => {
-                state.decision.evaluations[alternative][criterion] = 5; // Default score
-            });
+            if (!state.decision.evaluations[alternative]) {
+                state.decision.evaluations[alternative] = {};
+                
+                // Initialize with default values for each criterion
+                if (state.decision.criteria) {
+                    state.decision.criteria.forEach(criterion => {
+                        state.decision.evaluations[alternative][criterion] = 5; // Default value
+                    });
+                }
+            }
         });
+        
+        // Store alternative descriptions if provided
+        if (result.alternativeDescriptions) {
+            state.decision.alternativeDescriptions = { ...result.alternativeDescriptions };
+        }
     }
 
     if (result.evaluations) {
@@ -397,8 +490,15 @@ function updateState(result) {
         state.decision.results = { ...result.results };
     }
 
-    logger.log('STATE', 'State updated', state);
+    // Update current step if provided
+    if (result.step) {
+        state.currentStep = result.step;
+    }
+
+    // Save state to storage
     saveStateToStorage();
+    
+    logger.log('STATE', 'State updated successfully', state);
 }
 
 // Update UI to show the specified step
