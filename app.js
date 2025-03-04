@@ -69,6 +69,8 @@ app.use((req, res, next) => {
   res.locals.success_msg = req.flash('success_msg');
   res.locals.error_msg = req.flash('error_msg');
   res.locals.error = req.flash('error');
+  res.locals.user = req.user || null;
+  res.locals.isAuthenticated = req.isAuthenticated();
   next();
 });
 
@@ -96,57 +98,65 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.get('/', async (req, res) => {
-  logger.info('ROUTE', 'Rendering index page');
+    logger.info('ROUTE', 'Rendering index page');
     res.render('index', { 
-    title: 'New Decision',
+        title: 'New Decision',
         step: 1,
         decisions: {},
-        currentId: null
+        currentId: null,
+        isAuthenticated: req.isAuthenticated(),
+        user: req.user
     });
 });
 
 app.post('/save-step', async (req, res) => {
     try {
         const { step, data, currentState } = req.body;
-    const userId = req.isAuthenticated() ? req.user.id : null;
-    
-    logger.debug('SAVE_STEP', `Processing step ${step}`, { data, currentState });
+        const userId = req.isAuthenticated() ? req.user.id : null;
+        
+        logger.debug('SAVE_STEP', `Processing step ${step}`, { 
+            data, 
+            currentState,
+            isAuthenticated: req.isAuthenticated()
+        });
         
         if (!data || !data.id) {
-      logger.warn('SAVE_STEP', 'Invalid data format', data);
+            logger.warn('SAVE_STEP', 'Invalid data format', data);
             return res.status(400).json({ 
                 success: false, 
                 error: 'Invalid data format' 
             });
         }
 
-    // Process step using service
-    const decision = await decisionService.processStep(step, data, currentState, userId);
-    logger.debug('SAVE_STEP', 'Step processed successfully', decision);
+        // Process step using service
+        const decision = await decisionService.processStep(step, data, currentState, userId);
+        logger.debug('SAVE_STEP', 'Step processed successfully', decision);
 
-    // Prepare response
-    const response = { 
+        // Prepare response
+        const response = { 
             success: true,
             nextStep: step + 1,
             currentId: data.id,
             criteria: decision.criteria,
             weights: decision.weights,
-      alternatives: decision.alternatives,
-      isAuthenticated: req.isAuthenticated()
-    };
+            alternatives: decision.alternatives,
+            isAuthenticated: req.isAuthenticated(),
+            user: req.user ? { id: req.user.id } : null
+        };
 
-    // Add results for step 5
-    if (step === 5) {
-      response.results = decision.results;
-    }
+        // Add results for step 5
+        if (step === 5) {
+            response.results = decision.results;
+        }
 
-    logger.debug('SAVE_STEP', 'Sending response', response);
-    res.json(response);
+        logger.debug('SAVE_STEP', 'Sending response', response);
+        res.json(response);
     } catch (error) {
-    logger.error('SAVE_STEP', 'Error processing request', error);
-    res.status(400).json({ 
+        logger.error('SAVE_STEP', 'Error processing request', error);
+        res.status(400).json({ 
             success: false, 
-      error: error.message || 'An error occurred' 
+            error: error.message || 'An error occurred',
+            isAuthenticated: req.isAuthenticated()
         });
     }
 });
