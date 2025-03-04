@@ -83,15 +83,6 @@ app.use((req, res, next) => {
   res.locals.error = req.flash('error');
   res.locals.user = req.user || null;
   res.locals.isAuthenticated = req.isAuthenticated();
-  
-  // Log authentication status for debugging
-  logger.debug('AUTH', 'Request authentication status', {
-    isAuthenticated: req.isAuthenticated(),
-    hasUser: !!req.user,
-    sessionID: req.sessionID,
-    path: req.path
-  });
-  
   next();
 });
 
