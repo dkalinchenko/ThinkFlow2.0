@@ -407,18 +407,29 @@ class DecisionService {
    * Save a completed decision to a user's account
    * @param {string} decisionId - Decision ID
    * @param {number} userId - User ID
+   * @param {Object} decisionData - Decision data
    * @returns {Promise<Object>} - Updated decision
    */
-  async saveDecisionToUser(decisionId, userId) {
+  async saveDecisionToUser(decisionId, userId, decisionData) {
     try {
-      const decision = await this.getDecision(decisionId);
-      if (!decision) {
-        throw new Error('Decision not found');
+      let decision = await this.getDecision(decisionId);
+      
+      if (decision) {
+        // Update existing decision
+        decision = await this.updateDecision(decisionId, {
+          ...decisionData,
+          userId: userId
+        });
+      } else {
+        // Create new decision
+        decision = await Decision.create({
+          id: decisionId,
+          ...decisionData,
+          userId: userId
+        });
       }
       
-      // Update the decision with the user ID
-      const updatedDecision = await this.updateDecision(decisionId, { userId });
-      return updatedDecision;
+      return decision;
     } catch (error) {
       logger.error('DECISION', 'Error saving decision to user', error);
       throw error;

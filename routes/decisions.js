@@ -48,7 +48,7 @@ router.get('/decision/:id', ensureAuthenticated, async (req, res) => {
 // Save a decision to user account
 router.post('/save-to-account', ensureAuthenticated, async (req, res) => {
     try {
-        const { decisionId } = req.body;
+        const { decisionId, name, criteria, weights, alternatives, evaluations, results } = req.body;
         
         if (!decisionId) {
             return res.status(400).json({
@@ -57,7 +57,16 @@ router.post('/save-to-account', ensureAuthenticated, async (req, res) => {
             });
         }
         
-        await decisionService.saveDecisionToUser(decisionId, req.user.id);
+        const decisionData = {
+            name,
+            criteria,
+            weights,
+            alternatives,
+            evaluations,
+            results
+        };
+        
+        await decisionService.saveDecisionToUser(decisionId, req.user.id, decisionData);
         
         res.json({
             success: true,

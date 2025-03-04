@@ -67,6 +67,9 @@ function initializeApp() {
     // Set up step navigation
     setupStepNavigation();
     
+    // Set up save to account button
+    setupSaveToAccount();
+    
     // Set initial decision ID if not already set
     if (!state.decisionId) {
         const nameForm = document.getElementById('nameForm');
@@ -1208,6 +1211,238 @@ function canNavigateToStep(targetStep) {
             return false;
     }
 }
+
+// Setup save to account functionality
+function setupSaveToAccount() {
+    const saveBtn = document.getElementById('save-to-account-btn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/decisions/save-to-account', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        decisionId: state.decisionId,
+                        name: state.decision.name,
+                        criteria: state.decision.criteria,
+                        weights: state.decision.weights,
+                        alternatives: state.decision.alternatives,
+                        evaluations: state.decision.evaluations,
+                        results: state.decision.results
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Show success message
+                    showMessage('Decision saved successfully!', 'success');
+                } else {
+                    // Show error message
+                    showMessage(data.error || 'Error saving decision', 'error');
+                }
+            } catch (error) {
+                logger.error('SAVE', 'Error saving decision to account', error);
+                showMessage('Error saving decision to your account', 'error');
+            }
+        });
+    }
+}
+
+// Show message helper
+function showMessage(message, type = 'info') {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.role = 'alert';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    // Find a good place to show the alert
+    const container = document.querySelector('.step-container.active .card-body');
+    if (container) {
+        container.insertBefore(alertDiv, container.firstChild);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
+    }
+}
+
+// Calculate and display results
+async function calculateResults() {
+    try {
+        logger.log('CALC', 'Calculating results');
+        
+        // Get all the evaluation data
+        const evaluationData = {};
+        const evaluationRows = document.querySelectorAll('#evaluationMatrix .evaluation-row');
+        
+        evaluationRows.forEach(row => {
+            const alternative = row.getAttribute('data-alternative');
+            const criterion = row.getAttribute('data-criterion');
+            const score = parseInt(row.querySelector('input').value) || 0;
+            
+            if (!evaluationData[alternative]) {
+                evaluationData[alternative] = {};
+            }
+            evaluationData[alternative][criterion] = score;
+        });
+        
+        // Save evaluations to state
+        state.decision.evaluations = evaluationData;
+        
+        // Calculate weighted scores
+        const results = {};
+        const totalWeights = Object.values(state.decision.weights).reduce((sum, weight) => sum + parseInt(weight), 0);
+        
+        state.decision.alternatives.forEach(alternative => {
+            let totalScore = 0;
+            
+            state.decision.criteria.forEach(criterion => {
+                const score = evaluationData[alternative]?.[criterion] || 0;
+                const weight = parseInt(state.decision.weights[criterion]) || 0;
+                totalScore += (score * weight) / totalWeights;
+            });
+            
+            results[alternative] = totalScore;
+        });
+        
+        // Save results to state
+        state.decision.results = results;
+        saveStateToStorage();
+        
+        // Display results
+        displayResults(results);
+        
+        // Move to results step
+        goToStep(6);
+        
+    } catch (error) {
+        logger.error('CALC', 'Error calculating results', error);
+        showMessage('Error calculating results', 'error');
+    }
+}
+
+// Display results in table and chart
+function displayResults(results) {
+    try {
+        logger.log('DISPLAY', 'Displaying results', results);
+        
+        // Update decision name
+        const decisionNameDisplay = document.getElementById('decision-name-display');
+        if (decisionNameDisplay) {
+            decisionNameDisplay.textContent = state.decision.name;
+        }
+        
+        // Sort alternatives by score
+        const sortedAlternatives = Object.entries(results)
+            .sort(([,a], [,b]) => b - a)
+            .map(([name, score], index) => ({
+                name,
+                score: Math.round(score * 100), // Convert to percentage
+                rank: index + 1
+            }));
+        
+        // Update results table
+        const resultsTable = document.getElementById('results-table');
+        if (resultsTable) {
+            const tbody = resultsTable.querySelector('tbody');
+            tbody.innerHTML = sortedAlternatives.map(alt => `
+                <tr>
+                    <td>${alt.name}</td>
+                    <td>${alt.score}%</td>
+                    <td>#${alt.rank}</td>
+                </tr>
+            `).join('');
+        }
+        
+        // Update chart
+        const ctx = document.getElementById('resultsChart');
+        if (ctx) {
+            if (ctx.chart) {
+                ctx.chart.destroy();
+            }
+            
+            ctx.chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedAlternatives.map(alt => alt.name),
+                    datasets: [{
+                        label: 'Score (%)',
+                        data: sortedAlternatives.map(alt => alt.score),
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Score (%)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Score: ${context.parsed.y}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update criteria and weights list
+        const criteriaList = document.getElementById('criteria-weights-list');
+        if (criteriaList) {
+            criteriaList.innerHTML = state.decision.criteria.map(criterion => `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    ${criterion}
+                    <span class="badge bg-primary rounded-pill">Weight: ${state.decision.weights[criterion]}</span>
+                </li>
+            `).join('');
+        }
+        
+        // Update alternatives list
+        const alternativesList = document.getElementById('alternatives-list');
+        if (alternativesList) {
+            alternativesList.innerHTML = sortedAlternatives.map(alt => `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    ${alt.name}
+                    <span class="badge bg-success rounded-pill">${alt.score}% (#${alt.rank})</span>
+                </li>
+            `).join('');
+        }
+        
+    } catch (error) {
+        logger.error('DISPLAY', 'Error displaying results', error);
+        showMessage('Error displaying results', 'error');
+    }
+}
+
+// Add event listener to evaluation form
+document.addEventListener('DOMContentLoaded', function() {
+    const evaluationForm = document.getElementById('evaluationForm');
+    if (evaluationForm) {
+        evaluationForm.querySelector('button[type="submit"]').addEventListener('click', function(event) {
+            event.preventDefault();
+            calculateResults();
+        });
+    }
+});
 
 // Initialize the application when the DOM is fully loaded
 if (!window.hasInitialized) {
