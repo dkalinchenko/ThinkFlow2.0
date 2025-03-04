@@ -280,21 +280,9 @@
 </div>
 
 <script>
-    // This script will be executed after the main.js is loaded
+    // This script will initialize Chart.js
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialize Bootstrap validation
-        const forms = document.querySelectorAll('.needs-validation');
-        Array.from(forms).forEach(form => {
-            if (form.id !== 'evaluationForm') { // Skip evaluation form
-                form.addEventListener('submit', event => {
-                    if (!form.checkValidity()) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                    }
-                    form.classList.add('was-validated');
-                }, false);
-            }
-        });
+        // We'll let the main.js handle all form validation
     });
 </script>
 

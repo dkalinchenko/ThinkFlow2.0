@@ -88,57 +88,121 @@ function initializeApp() {
 // Load state from localStorage
 function loadStateFromStorage() {
     try {
-        const savedState = localStorage.getItem('decisionMatrixState');
+        logger.log('STORAGE', 'Loading state from localStorage');
+        
+        // Try to get state from localStorage
+        const savedState = localStorage.getItem('decisionState');
+        
         if (savedState) {
+            // Parse the state
             const parsedState = JSON.parse(savedState);
+            
+            // Validate state structure
             if (parsedState && parsedState.decision) {
-                // Merge saved state with current state
-                state.currentStep = parsedState.currentStep || 1;
-                state.decisionId = parsedState.decisionId;
-                state.decision = parsedState.decision;
-                logger.log('STORAGE', 'Loaded state from localStorage', state);
+                state = parsedState;
+                logger.log('STORAGE', 'State loaded successfully from localStorage');
+            } else {
+                logger.warn('STORAGE', 'Invalid state structure in localStorage, initializing fresh state');
+                state = resetState();
             }
         } else {
-            logger.log('STORAGE', 'No saved state found');
+            logger.log('STORAGE', 'No saved state found in localStorage, initializing fresh state');
+            state = resetState();
         }
     } catch (error) {
-        logger.error('STORAGE', 'Error loading state from localStorage', error);
-        resetState();
+        logger.error('STORAGE', 'Error loading state from localStorage:', error);
+        state = resetState();
     }
+    
+    // Ensure we always have a valid state
+    if (!state || !state.decision) {
+        logger.warn('STORAGE', 'Invalid state after loading, resetting to default');
+        state = resetState();
+    }
+    
+    logger.log('STORAGE', 'Current state:', state);
 }
 
 // Save state to localStorage
 function saveStateToStorage() {
     try {
-        localStorage.setItem('decisionMatrixState', JSON.stringify(state));
-        logger.log('STORAGE', 'State saved to localStorage');
+        logger.log('STORAGE', 'Saving state to localStorage');
+        
+        // Save state to localStorage
+        localStorage.setItem('decisionState', JSON.stringify(state));
+        
+        logger.log('STORAGE', 'State saved successfully to localStorage');
     } catch (error) {
-        logger.error('STORAGE', 'Error saving state to localStorage', error);
+        logger.error('STORAGE', 'Error saving state to localStorage:', error);
     }
 }
 
 // Reset application state
 function resetState() {
-    state.currentStep = 1;
-    state.decisionId = Date.now().toString();
-    state.decision = {
-        name: '',
-        criteria: [],
-        weights: {},
-        alternatives: [],
-        evaluations: {},
-        results: {}
+    logger.log('STATE', 'Resetting state');
+    
+    // Clear state
+    state = {
+        currentStep: 1,
+        decision: {
+            name: '',
+            criteria: [],
+            weights: {},
+            alternatives: [],
+            evaluations: {},
+            results: {}
+        }
     };
+    
+    // Save to storage
     saveStateToStorage();
-    logger.log('STATE', 'State reset to initial values');
+    
+    logger.log('STATE', 'State reset complete');
+    
+    return state;
 }
 
 // Setup form handlers
 function setupFormHandlers() {
     logger.log('SETUP', 'Setting up form handlers');
     
-    // Add event listeners to forms for steps 1-4 (step 5 is handled separately)
-    const formIds = ['nameForm', 'criteriaForm', 'weightsForm', 'alternativesForm'];
+    // Get a reference to the name form
+    const nameForm = document.getElementById('nameForm');
+    if (nameForm) {
+        // Remove existing listeners by replacing with clone
+        const newNameForm = nameForm.cloneNode(true);
+        nameForm.parentNode.replaceChild(newNameForm, nameForm);
+        
+        // Add direct submit handler for the name form
+        newNameForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            const nameInput = newNameForm.querySelector('input[name="name"]');
+            if (!nameInput || !nameInput.value.trim()) {
+                newNameForm.classList.add('was-validated');
+                return;
+            }
+            
+            // Update state
+            updateState({
+                name: nameInput.value.trim(),
+                step: 2
+            });
+            
+            // Move to next step
+            updateStep(2);
+            
+            // Reset validation state
+            newNameForm.classList.remove('was-validated');
+            
+            logger.log('FORM', 'Name form submitted successfully');
+        });
+    } else {
+        logger.error('SETUP', 'Name form not found');
+    }
+    
+    // Handle remaining forms
+    const formIds = ['criteriaForm', 'weightsForm', 'alternativesForm'];
     
     formIds.forEach((formId, index) => {
         const form = document.getElementById(formId);
@@ -150,37 +214,13 @@ function setupFormHandlers() {
             // Add the event listener
             newForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
-                event.stopPropagation();
-                
-                // Validate form
-                newForm.classList.add('was-validated');
-                
-                // Only proceed if form is valid
-                if (newForm.checkValidity()) {
-                    await handleFormSubmit(newForm, index + 1);
-                } else {
-                    logger.log('FORM', `Form validation failed for ${formId}`);
-                }
-            });
-            
-            // Add input validation listeners
-            const inputs = newForm.querySelectorAll('input[required]');
-            inputs.forEach(input => {
-                input.addEventListener('input', () => {
-                    if (input.checkValidity()) {
-                        input.classList.remove('is-invalid');
-                        input.classList.add('is-valid');
-                    } else {
-                        input.classList.remove('is-valid');
-                        input.classList.add('is-invalid');
-                    }
-                });
+                await handleFormSubmit(newForm, index + 2); // +2 because we start at step 2
             });
         } else {
             logger.error('SETUP', `Form with id ${formId} not found`);
         }
     });
-
+    
     logger.log('SETUP', 'Form handlers setup complete');
 }
 
@@ -204,28 +244,25 @@ function setupDynamicControls() {
     const addAlternativeBtn = document.getElementById('addAlternativeBtn');
     const newDecisionBtn = document.getElementById('newDecisionBtn');
     
-    // Remove any existing event listeners by cloning
-    const newAddCriteriaBtn = replaceButtonWithClone('addCriteriaBtn');
-    const newAddAlternativeBtn = replaceButtonWithClone('addAlternativeBtn');
-    const newNewDecisionBtn = replaceButtonWithClone('newDecisionBtn');
-    
-    // Add fresh event listeners
-    if (newAddCriteriaBtn) {
-        newAddCriteriaBtn.addEventListener('click', function(event) {
+    // Setup add criteria button
+    if (addCriteriaBtn) {
+        addCriteriaBtn.addEventListener('click', function(event) {
             logger.log('CLICK', 'Add criteria button clicked');
             addCriteriaField(event);
         });
     }
     
-    if (newAddAlternativeBtn) {
-        newAddAlternativeBtn.addEventListener('click', function(event) {
+    // Setup add alternative button
+    if (addAlternativeBtn) {
+        addAlternativeBtn.addEventListener('click', function(event) {
             logger.log('CLICK', 'Add alternative button clicked');
             addAlternativeField(event);
         });
     }
     
-    if (newNewDecisionBtn) {
-        newNewDecisionBtn.addEventListener('click', function() {
+    // Setup new decision button
+    if (newDecisionBtn) {
+        newDecisionBtn.addEventListener('click', function() {
             logger.log('CLICK', 'New decision button clicked');
             if (confirm('Are you sure you want to start a new decision? All current data will be lost.')) {
                 resetState();
