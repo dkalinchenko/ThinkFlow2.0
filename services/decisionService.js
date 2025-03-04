@@ -391,7 +391,7 @@ class DecisionService {
           totalWeightedScore += weightedScore;
         });
         
-        results[alternative] = Math.round(totalWeightedScore * 10 * 100) / 100;
+        results[alternative] = Math.round(totalWeightedScore * 100) / 100;
         logger.debug('CALCULATION', `Final score for ${alternative}: ${results[alternative]}`);
       });
       

@@ -652,7 +652,7 @@ async function showResults(results, currentState) {
         const formattedResults = Object.entries(results).map(([alternative, score]) => {
             return {
                 alternative,
-                score: typeof score === 'number' ? parseFloat(score.toFixed(2)) : 0
+                score: typeof score === 'number' ? parseFloat((score * 100).toFixed(1)) : 0
             };
         }).sort((a, b) => b.score - a.score);
 
@@ -675,8 +675,8 @@ async function showResults(results, currentState) {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${result.alternative}</td>
-                <td>${result.score}</td>
-                <td>${index + 1}</td>
+                <td>${result.score}%</td>
+                <td>#${index + 1}</td>
             `;
             resultsTableBody.appendChild(row);
         });
@@ -825,7 +825,7 @@ function createResultsChart(formattedResults) {
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Score',
+                        label: 'Score (%)',
                         data: data,
                         backgroundColor: backgroundColors.slice(0, labels.length),
                         borderColor: backgroundColors.slice(0, labels.length).map(color => color.replace('0.7', '1')),
@@ -838,6 +838,13 @@ function createResultsChart(formattedResults) {
                     plugins: {
                         legend: {
                             display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Score: ${context.parsed.y}%`;
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -845,8 +852,9 @@ function createResultsChart(formattedResults) {
                             beginAtZero: true,
                             title: {
                                 display: true,
-                                text: 'Score'
-                            }
+                                text: 'Score (%)'
+                            },
+                            max: 100
                         },
                         x: {
                             title: {
