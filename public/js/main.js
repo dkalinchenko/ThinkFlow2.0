@@ -129,7 +129,19 @@ function setupFormHandlers() {
             // Add the event listener
             newForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
-                await handleFormSubmit(newForm, index + 1);
+                const submitButton = newForm.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                }
+                try {
+                    await handleFormSubmit(newForm, index + 1);
+                } catch (error) {
+                    showError('Error submitting form: ' + error.message);
+                } finally {
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                    }
+                }
             });
         }
     });
@@ -229,18 +241,10 @@ async function handleFormSubmit(form, step) {
             case 1: // Name
                 const formData = new FormData(form);
                 const name = formData.get('name');
-                
-                // Initialize new decision state
-                state.decision = {
-                    name: name,
-                    criteria: [],
-                    weights: {},
-                    alternatives: [],
-                    evaluations: {},
-                    results: {}
-                };
-                
-                // Prepare data for server
+                if (!name || name.trim() === '') {
+                    throw new Error('Please enter a decision name');
+                }
+                state.decision.name = name;
                 data.name = name;
                 break;
 
@@ -251,27 +255,16 @@ async function handleFormSubmit(form, step) {
                     .map(c => c.trim());
                 
                 if (criteria.length === 0) {
-                    showError('Please add at least one criterion');
-                    return;
+                    throw new Error('Please add at least one criterion');
                 }
                 
-                // Store criteria in state
                 state.decision.criteria = [...criteria];
-                
-                // Initialize weights with default values
-                state.decision.weights = {};
-                criteria.forEach(criterion => {
-                    state.decision.weights[criterion] = 5;
-                });
-                
-                // Prepare data for server
                 data.criteria = criteria;
                 break;
 
             case 3: // Weights
                 if (!state.decision.criteria || !Array.isArray(state.decision.criteria) || state.decision.criteria.length === 0) {
-                    showError('Please define criteria in step 2 first.');
-                    return;
+                    throw new Error('Please define criteria in step 2 first.');
                 }
 
                 const weightsFormData = new FormData(form);
@@ -281,23 +274,18 @@ async function handleFormSubmit(form, step) {
                     const weightInput = weightsFormData.get(`weights[${criterion}]`);
                     
                     if (!weightInput) {
-                        showError(`Please enter a weight for ${criterion}`);
-                        return;
+                        throw new Error(`Please enter a weight for ${criterion}`);
                     }
                     
                     const weight = parseInt(weightInput);
                     if (isNaN(weight) || weight < 1 || weight > 10) {
-                        showError(`Please enter a valid weight (1-10) for ${criterion}`);
-                        return;
+                        throw new Error(`Please enter a valid weight (1-10) for ${criterion}`);
                     }
                     
                     weights[criterion] = weight;
                 }
                 
-                // Store weights in state
                 state.decision.weights = {...weights};
-                
-                // Prepare data for server
                 data.weights = weights;
                 break;
 
@@ -308,33 +296,18 @@ async function handleFormSubmit(form, step) {
                     .map(a => a.trim());
                 
                 if (alternatives.length === 0) {
-                    showError('Please add at least one alternative');
-                    return;
+                    throw new Error('Please add at least one alternative');
                 }
                 
-                // Store alternatives in state
                 state.decision.alternatives = [...alternatives];
-                
-                // Initialize evaluations
-                state.decision.evaluations = {};
-                alternatives.forEach(alternative => {
-                    state.decision.evaluations[alternative] = {};
-                    state.decision.criteria.forEach(criterion => {
-                        state.decision.evaluations[alternative][criterion] = 5;
-                    });
-                });
-                
-                // Prepare data for server
                 data.alternatives = alternatives;
                 break;
 
             case 5: // Evaluations
                 if (!state.decision.evaluations || Object.keys(state.decision.evaluations).length === 0) {
-                    showError('No evaluation data found. Please rate all alternatives.');
-                    return;
+                    throw new Error('No evaluation data found. Please rate all alternatives.');
                 }
                 
-                // For step 5, we use the evaluations already stored in state
                 data.evaluations = state.decision.evaluations;
                 break;
         }
