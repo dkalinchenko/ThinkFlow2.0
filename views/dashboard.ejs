@@ -1,0 +1,58 @@
+<div class="row">
+  <div class="col-md-12">
+    <h2>Welcome, <%= user.username %></h2>
+    <p>This is your decision matrix dashboard. Here you can manage your saved decisions and create new ones.</p>
+  </div>
+</div>
+
+<div class="row mt-4">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h3 class="mb-0">Quick Actions</h3>
+      </div>
+      <div class="card-body">
+        <div class="d-grid gap-3">
+          <a href="/" class="btn btn-primary">Create New Decision</a>
+          <a href="/my-decisions" class="btn btn-outline-primary">View My Decisions</a>
+          <a href="/logout" class="btn btn-outline-danger">Logout</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h3 class="mb-0">Account Information</h3>
+      </div>
+      <div class="card-body">
+        <p><strong>Username:</strong> <%= user.username %></p>
+        <p><strong>Email:</strong> <%= user.email %></p>
+        <p><strong>Member Since:</strong> <%= new Date(user.createdAt).toLocaleDateString() %></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-4">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h3 class="mb-0">About Decision Matrix</h3>
+      </div>
+      <div class="card-body">
+        <p>A decision matrix is a tool that helps you evaluate and prioritize options based on weighted criteria.</p>
+        <p>How it works:</p>
+        <ol>
+          <li>Define your decision and criteria</li>
+          <li>Assign weights to each criterion</li>
+          <li>List your alternatives</li>
+          <li>Evaluate each alternative against each criterion</li>
+          <li>Calculate the results</li>
+        </ol>
+        <p>This app guides you through each step and saves your decisions for future reference.</p>
+      </div>
+    </div>
+  </div>
+</div> 

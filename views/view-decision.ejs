@@ -1,0 +1,180 @@
+<div class="row">
+  <div class="col-md-12">
+    <div class="mb-3">
+      <a href="/my-decisions" class="btn btn-outline-primary">
+        <i class="fas fa-arrow-left"></i> Back to My Decisions
+      </a>
+    </div>
+    
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h2 class="mb-0"><%= decision.name %></h2>
+      </div>
+      <div class="card-body">
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <h4>Decision Details</h4>
+            <p><strong>Created:</strong> <%= new Date(decision.createdAt).toLocaleString() %></p>
+            <p><strong>Last Updated:</strong> <%= new Date(decision.updatedAt).toLocaleString() %></p>
+          </div>
+        </div>
+        
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-header bg-light">
+                <h4 class="mb-0">Criteria</h4>
+              </div>
+              <div class="card-body">
+                <% if (decision.criteria && decision.criteria.length > 0) { %>
+                  <ul class="list-group">
+                    <% decision.criteria.forEach(function(criterion) { %>
+                      <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <%= criterion %>
+                        <span class="badge bg-primary rounded-pill">Weight: <%= decision.weights[criterion] %></span>
+                      </li>
+                    <% }); %>
+                  </ul>
+                <% } else { %>
+                  <p class="text-muted">No criteria defined</p>
+                <% } %>
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-header bg-light">
+                <h4 class="mb-0">Alternatives</h4>
+              </div>
+              <div class="card-body">
+                <% if (decision.alternatives && decision.alternatives.length > 0) { %>
+                  <ul class="list-group">
+                    <% decision.alternatives.forEach(function(alternative) { %>
+                      <li class="list-group-item"><%= alternative %></li>
+                    <% }); %>
+                  </ul>
+                <% } else { %>
+                  <p class="text-muted">No alternatives defined</p>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <% if (decision.results && Object.keys(decision.results).length > 0) { %>
+          <div class="row">
+            <div class="col-md-12">
+              <div class="card">
+                <div class="card-header bg-light">
+                  <h4 class="mb-0">Results</h4>
+                </div>
+                <div class="card-body">
+                  <div class="results-chart">
+                    <canvas id="resultsChart"></canvas>
+                  </div>
+                  
+                  <div class="table-responsive mt-4">
+                    <table class="table table-striped">
+                      <thead>
+                        <tr>
+                          <th>Alternative</th>
+                          <th>Score</th>
+                          <th>Rank</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% 
+                          // Sort alternatives by score
+                          const sortedAlternatives = Object.keys(decision.results).sort((a, b) => 
+                            decision.results[b] - decision.results[a]
+                          );
+                        %>
+                        <% sortedAlternatives.forEach(function(alternative, index) { %>
+                          <tr>
+                            <td><%= alternative %></td>
+                            <td><%= decision.results[alternative].toFixed(2) %></td>
+                            <td><%= index + 1 %></td>
+                          </tr>
+                        <% }); %>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <script>
+            document.addEventListener('DOMContentLoaded', function() {
+              const ctx = document.getElementById('resultsChart').getContext('2d');
+              
+              // Prepare data for chart
+              const labels = [];
+              const data = [];
+              const backgroundColors = [
+                'rgba(54, 162, 235, 0.7)',
+                'rgba(255, 99, 132, 0.7)',
+                'rgba(255, 206, 86, 0.7)',
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(153, 102, 255, 0.7)',
+                'rgba(255, 159, 64, 0.7)',
+                'rgba(199, 199, 199, 0.7)'
+              ];
+              
+              <% sortedAlternatives.forEach(function(alternative, index) { %>
+                labels.push('<%= alternative %>');
+                data.push(<%= decision.results[alternative] %>);
+              <% }); %>
+              
+              // Create chart
+              new Chart(ctx, {
+                type: 'bar',
+                data: {
+                  labels: labels,
+                  datasets: [{
+                    label: 'Score',
+                    data: data,
+                    backgroundColor: backgroundColors.slice(0, labels.length),
+                    borderColor: backgroundColors.slice(0, labels.length).map(color => color.replace('0.7', '1')),
+                    borderWidth: 1
+                  }]
+                },
+                options: {
+                  responsive: true,
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      title: {
+                        display: true,
+                        text: 'Score'
+                      }
+                    },
+                    x: {
+                      title: {
+                        display: true,
+                        text: 'Alternative'
+                      }
+                    }
+                  },
+                  plugins: {
+                    title: {
+                      display: true,
+                      text: 'Decision Results',
+                      font: {
+                        size: 16
+                      }
+                    },
+                    legend: {
+                      display: false
+                    }
+                  }
+                }
+              });
+            });
+          </script>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div> 

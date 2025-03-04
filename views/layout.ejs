@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= typeof title !== 'undefined' ? title + ' - ' : '' %>Decision Matrix App</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="/css/style.css" rel="stylesheet">
+    <style>
+        .step-container {
+            display: none;
+        }
+        .step-container.active {
+            display: block;
+        }
+        .step-indicator {
+            margin-bottom: 2rem;
+        }
+        .step-indicator .step {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 0.5rem;
+        }
+        .step-indicator .step.active {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .criteria-item, .alternative-item {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.25rem;
+        }
+        .results-chart {
+            max-width: 800px;
+            margin: 2rem auto;
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+        .user-avatar {
+            width: 30px;
+            height: 30px;
+            background-color: #0d6efd;
+            color: white;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 5px;
+        }
+        .dropdown-menu {
+            min-width: 200px;
+        }
+    </style>
+    <!-- Enable debug mode -->
+    <script>
+        window.debugMode = true; // Always enable debug mode for now
+        
+        // Create a debug console
+        if (window.debugMode) {
+            window.addEventListener('DOMContentLoaded', () => {
+                const debugConsole = document.createElement('div');
+                debugConsole.id = 'debug-console';
+                debugConsole.style.cssText = `
+                    position: fixed;
+                    bottom: 0;
+                    right: 0;
+                    width: 400px;
+                    height: 300px;
+                    background: rgba(0, 0, 0, 0.8);
+                    color: #fff;
+                    font-family: monospace;
+                    font-size: 12px;
+                    padding: 10px;
+                    overflow-y: auto;
+                    z-index: 9999;
+                `;
+                document.body.appendChild(debugConsole);
+                
+                // Override console.log and console.error
+                const originalLog = console.log;
+                const originalError = console.error;
+                
+                console.log = function() {
+                    const args = Array.from(arguments);
+                    const message = args.map(arg => 
+                        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+                    ).join(' ');
+                    
+                    const logEntry = document.createElement('div');
+                    logEntry.style.color = '#90EE90';
+                    logEntry.textContent = `LOG: ${message}`;
+                    debugConsole.appendChild(logEntry);
+                    debugConsole.scrollTop = debugConsole.scrollHeight;
+                    
+                    originalLog.apply(console, arguments);
+                };
+                
+                console.error = function() {
+                    const args = Array.from(arguments);
+                    const message = args.map(arg => 
+                        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+                    ).join(' ');
+                    
+                    const logEntry = document.createElement('div');
+                    logEntry.style.color = '#FF6B6B';
+                    logEntry.textContent = `ERROR: ${message}`;
+                    debugConsole.appendChild(logEntry);
+                    debugConsole.scrollTop = debugConsole.scrollHeight;
+                    
+                    originalError.apply(console, arguments);
+                };
+            });
+        }
+    </script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-table-list me-2"></i>
+                Decision Matrix App
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/" id="newDecisionLink">
+                            <i class="fas fa-plus-circle me-1"></i> New Decision
+                        </a>
+                    </li>
+                    <% if (typeof isAuthenticated !== 'undefined' && isAuthenticated) { %>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/my-decisions">
+                            <i class="fas fa-list-check me-1"></i> My Decisions
+                        </a>
+                    </li>
+                    <% } %>
+                </ul>
+                
+                <ul class="navbar-nav ms-auto">
+                    <% if (typeof isAuthenticated !== 'undefined' && isAuthenticated) { %>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <div class="user-avatar">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <%= user.username %>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                <li>
+                                    <a class="dropdown-item" href="/dashboard">
+                                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="/my-decisions">
+                                        <i class="fas fa-list-check me-2"></i> My Decisions
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item" href="/logout">
+                                        <i class="fas fa-sign-out-alt me-2"></i> Logout
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    <% } else { %>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/login">
+                                <i class="fas fa-sign-in-alt me-1"></i> Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/register">
+                                <i class="fas fa-user-plus me-1"></i> Register
+                            </a>
+                        </li>
+                    <% } %>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Toast container for notifications -->
+        <div class="toast-container"></div>
+        
+        <!-- Flash messages -->
+        <%- include('partials/messages') %>
+        
+        <!-- Main content -->
+        <%- body %>
+        
+        <!-- Footer -->
+        <footer class="mt-5 pt-3 text-center text-muted border-top">
+            <p>Decision Matrix App &copy; <%= new Date().getFullYear() %></p>
+        </footer>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Custom JS -->
+    <script>
+        // Wait for Chart.js to load
+        window.addEventListener('load', function() {
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js failed to load');
+            } else {
+                console.log('Chart.js loaded successfully');
+            }
+        });
+    </script>
+    <script src="/js/main.js"></script>
+    
+    <script>
+        // Helper function to show toast notifications
+        window.showToast = function(message, type = 'info') {
+            const toastContainer = document.querySelector('.toast-container');
+            const toastId = 'toast-' + Date.now();
+            const toastHtml = `
+                <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-header bg-${type === 'error' ? 'danger' : 'primary'} text-white">
+                        <strong class="me-auto">${type === 'error' ? 'Error' : 'Notification'}</strong>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 5000 });
+            toast.show();
+            
+            // Remove toast from DOM after it's hidden
+            toastElement.addEventListener('hidden.bs.toast', function() {
+                toastElement.remove();
+            });
+        };
+        
+        // Handle new decision link
+        document.getElementById('newDecisionLink').addEventListener('click', function(e) {
+            e.preventDefault();
+            if (confirm('Start a new decision? This will reset your current progress.')) {
+                localStorage.removeItem('decisionMatrixState');
+                window.location.href = '/';
+            }
+        });
+
+        // Save decision to account (for logged-in users)
+        window.saveDecisionToAccount = function(decisionId) {
+            fetch('/save-to-account', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ decisionId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                } else {
+                    showToast(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showToast('An error occurred while saving the decision', 'error');
+                console.error('Error:', error);
+            });
+        };
+    </script>
+</body>
+</html>

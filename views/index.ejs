@@ -1,0 +1,307 @@
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="step-indicator d-flex justify-content-between mb-4">
+            <div class="text-center step-link" data-step="1">
+                <div class="step <%= step >= 1 ? 'active' : '' %>">
+                    <i class="fas fa-pencil-alt"></i>
+                </div>
+                <small>Name</small>
+            </div>
+            <div class="text-center step-link" data-step="2">
+                <div class="step <%= step >= 2 ? 'active' : '' %>">
+                    <i class="fas fa-list"></i>
+                </div>
+                <small>Criteria</small>
+            </div>
+            <div class="text-center step-link" data-step="3">
+                <div class="step <%= step >= 3 ? 'active' : '' %>">
+                    <i class="fas fa-balance-scale"></i>
+                </div>
+                <small>Weights</small>
+            </div>
+            <div class="text-center step-link" data-step="4">
+                <div class="step <%= step >= 4 ? 'active' : '' %>">
+                    <i class="fas fa-tasks"></i>
+                </div>
+                <small>Alternatives</small>
+            </div>
+            <div class="text-center step-link" data-step="5">
+                <div class="step <%= step >= 5 ? 'active' : '' %>">
+                    <i class="fas fa-star"></i>
+                </div>
+                <small>Evaluate</small>
+            </div>
+            <div class="text-center step-link" data-step="6">
+                <div class="step <%= step >= 6 ? 'active' : '' %>">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <small>Results</small>
+            </div>
+        </div>
+
+        <!-- Step 1: Decision Name -->
+        <div class="step-container <%= step === 1 ? 'active' : '' %>" id="step1">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">Name Your Decision</h3>
+                    <p class="card-text">What decision are you trying to make?</p>
+                    <form id="nameForm" class="needs-validation" novalidate>
+                        <input type="hidden" name="id" value="<%= Date.now() %>">
+                        <div class="mb-3">
+                            <label for="decisionName" class="form-label">Decision Name</label>
+                            <input type="text" class="form-control" id="decisionName" name="name" placeholder="e.g., Choosing a New Car" required>
+                            <div class="invalid-feedback">
+                                Please enter a name for your decision.
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Next</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Define Criteria -->
+        <div class="step-container <%= step === 2 ? 'active' : '' %>" id="step2">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">Define Your Criteria</h3>
+                    <p class="card-text">What factors are important in making this decision?</p>
+                    <form id="criteriaForm" class="needs-validation" novalidate>
+                        <div id="criteriaList" class="mb-3">
+                            <div class="criteria-item">
+                                <div class="input-group mb-2">
+                                    <input type="text" class="form-control" name="criteria[]" placeholder="Enter criterion" required>
+                                    <button type="button" class="btn btn-outline-danger remove-btn">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-secondary mb-3" id="addCriteriaBtn">Add Another Criterion</button>
+                        <div>
+                            <button type="submit" class="btn btn-primary">Next</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Set Weights -->
+        <div class="step-container <%= step === 3 ? 'active' : '' %>" id="step3">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">Set Criteria Weights</h3>
+                    <p class="card-text">How important is each criterion? (1-10)</p>
+                    <form id="weightsForm" class="needs-validation" novalidate>
+                        <div id="weightsList" class="mb-3">
+                            <% if (decisions && currentId && decisions[currentId] && decisions[currentId].criteria) { %>
+                                <% decisions[currentId].criteria.forEach(function(criterion) { %>
+                                    <div class="mb-3">
+                                        <label class="form-label"><%= criterion %></label>
+                                        <input type="number" 
+                                               class="form-control" 
+                                               name="weights[<%= criterion %>]" 
+                                               min="1" 
+                                               max="10" 
+                                               value="<%= decisions[currentId].weights[criterion] || 5 %>"
+                                               required>
+                                    </div>
+                                <% }); %>
+                            <% } else { %>
+                                <div class="alert alert-warning">
+                                    Please define criteria first.
+                                </div>
+                            <% } %>
+                        </div>
+                        <% if (decisions && currentId && decisions[currentId] && decisions[currentId].criteria && decisions[currentId].criteria.length > 0) { %>
+                            <button type="submit" class="btn btn-primary">Next</button>
+                        <% } else { %>
+                            <a href="/" class="btn btn-secondary">Start Over</a>
+                        <% } %>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Add Alternatives -->
+        <div class="step-container <%= step === 4 ? 'active' : '' %>" id="step4">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">Add Alternatives</h3>
+                    <p class="card-text">What are your options?</p>
+                    <form id="alternativesForm" class="needs-validation" novalidate>
+                        <div id="alternativesList" class="mb-3">
+                            <div class="alternative-item">
+                                <div class="input-group mb-2">
+                                    <input type="text" class="form-control" name="alternatives[]" placeholder="Enter alternative" required>
+                                    <button type="button" class="btn btn-outline-danger remove-btn">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-secondary mb-3" id="addAlternativeBtn">Add Another Alternative</button>
+                        <div>
+                            <button type="submit" class="btn btn-primary">Next</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 5: Evaluate Alternatives -->
+        <div class="step-container <%= step === 5 ? 'active' : '' %>" id="step5">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">Evaluate Alternatives</h3>
+                    <p class="card-text">Rate each alternative against each criterion (1-10)</p>
+                    <form id="evaluationForm" onsubmit="return false;">
+                        <div id="evaluationMatrix" class="mb-3">
+                            <!-- Evaluation matrix will be generated dynamically by JavaScript -->
+                        </div>
+                        <button type="submit" class="btn btn-primary" onclick="return false;">Calculate Results</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="step-container <%= step === 6 ? 'active' : '' %>" id="step6">
+            <div class="row mb-4">
+                <div class="col-md-12 text-center">
+                    <h2>Decision Results</h2>
+                    <p class="text-muted">Below are the results of your decision matrix analysis.</p>
+                </div>
+            </div>
+
+            <div class="row justify-content-center mb-4">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="card-title mb-0">Decision: <span id="decision-name-display"></span></h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="results-chart">
+                                <canvas id="resultsChart"></canvas>
+                            </div>
+                            
+                            <div class="table-responsive mt-4">
+                                <table class="table table-striped" id="results-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Alternative</th>
+                                            <th>Score</th>
+                                            <th>Rank</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Results will be populated here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="mt-4 text-center">
+                                <% if (typeof isAuthenticated !== 'undefined' && isAuthenticated) { %>
+                                    <button id="save-to-account-btn" class="btn btn-success btn-lg">
+                                        <i class="fas fa-save me-2"></i> Save To My Account
+                                    </button>
+                                <% } else { %>
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i> <a href="/login">Log in</a> or <a href="/register">register</a> to save this decision to your account.
+                                    </div>
+                                <% } %>
+                                
+                                <button id="start-new-btn" class="btn btn-primary btn-lg ms-2">
+                                    <i class="fas fa-plus me-2"></i> Start New Decision
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h4 class="mb-0">Decision Details</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5>Criteria and Weights</h5>
+                                    <ul class="list-group mb-4" id="criteria-weights-list">
+                                        <!-- Criteria and weights will be populated here -->
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5>Alternatives</h5>
+                                    <ul class="list-group" id="alternatives-list">
+                                        <!-- Alternatives will be populated here -->
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // This script will be executed after the main.js is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Bootstrap validation
+        const forms = document.querySelectorAll('.needs-validation');
+        Array.from(forms).forEach(form => {
+            if (form.id !== 'evaluationForm') { // Skip evaluation form
+                form.addEventListener('submit', event => {
+                    if (!form.checkValidity()) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                    form.classList.add('was-validated');
+                }, false);
+            }
+        });
+    });
+</script>
+
+<style>
+    .step-indicator .step {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #e9ecef;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 8px;
+        transition: all 0.3s ease;
+    }
+
+    .step-indicator .step.active {
+        background-color: #007bff;
+        color: white;
+    }
+
+    .step-link {
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .step-link:hover .step:not(.active) {
+        background-color: #dee2e6;
+        transform: scale(1.1);
+    }
+
+    .step-link .fas {
+        font-size: 1.2em;
+    }
+
+    .step-indicator small {
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    .step-indicator .active + small {
+        color: #007bff;
+    }
+</style>
