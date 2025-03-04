@@ -1273,10 +1273,218 @@ function showMessage(message, type = 'info') {
     }
 }
 
-// Calculate and display results
+// Display results in table and chart
+function displayResults(results) {
+    try {
+        logger.log('DISPLAY', 'Displaying results', results);
+        
+        // Update decision name
+        const decisionNameDisplay = document.getElementById('decision-name-display');
+        if (decisionNameDisplay) {
+            decisionNameDisplay.textContent = state.decision.name;
+        }
+        
+        // Sort alternatives by score
+        const sortedAlternatives = Object.entries(results)
+            .sort(([,a], [,b]) => b - a)
+            .map(([name, score], index) => ({
+                name,
+                score: Math.round(score * 100), // Convert to percentage
+                rank: index + 1
+            }));
+        
+        // Update results table
+        const resultsTable = document.getElementById('results-table');
+        if (resultsTable) {
+            const tbody = resultsTable.querySelector('tbody');
+            tbody.innerHTML = sortedAlternatives.map(alt => `
+                <tr>
+                    <td>${alt.name}</td>
+                    <td>${alt.score}%</td>
+                    <td>#${alt.rank}</td>
+                </tr>
+            `).join('');
+        }
+        
+        // Update chart
+        updateResultsChart(sortedAlternatives);
+        
+        // Update criteria and weights list
+        const criteriaList = document.getElementById('criteria-weights-list');
+        if (criteriaList) {
+            criteriaList.innerHTML = state.decision.criteria.map(criterion => `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    ${criterion}
+                    <span class="badge bg-primary rounded-pill">Weight: ${state.decision.weights[criterion]}</span>
+                </li>
+            `).join('');
+        }
+        
+        // Update alternatives list
+        const alternativesList = document.getElementById('alternatives-list');
+        if (alternativesList) {
+            alternativesList.innerHTML = sortedAlternatives.map(alt => `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    ${alt.name}
+                    <span class="badge bg-success rounded-pill">${alt.score}% (#${alt.rank})</span>
+                </li>
+            `).join('');
+        }
+        
+        // Set up dynamic weight adjustment
+        setupDynamicWeights();
+        
+    } catch (error) {
+        logger.error('DISPLAY', 'Error displaying results', error);
+        showMessage('Error displaying results', 'error');
+    }
+}
+
+// Update results chart
+function updateResultsChart(sortedAlternatives) {
+    const ctx = document.getElementById('resultsChart');
+    if (!ctx) return;
+    
+    if (window.resultsChart) {
+        window.resultsChart.destroy();
+    }
+    
+    window.resultsChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: sortedAlternatives.map(alt => alt.name),
+            datasets: [{
+                label: 'Score (%)',
+                data: sortedAlternatives.map(alt => alt.score),
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Score (%)'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Score: ${context.parsed.y}%`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Set up dynamic weight adjustment
+function setupDynamicWeights() {
+    const container = document.getElementById('dynamic-weights-container');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    // Create weight sliders for each criterion
+    state.decision.criteria.forEach(criterion => {
+        const weight = state.decision.weights[criterion];
+        
+        const field = document.createElement('div');
+        field.className = 'mb-4';
+        
+        const labelContainer = document.createElement('div');
+        labelContainer.className = 'd-flex justify-content-between align-items-center mb-2';
+        
+        const label = document.createElement('label');
+        label.className = 'form-label mb-0';
+        label.textContent = criterion;
+        
+        const valueDisplay = document.createElement('span');
+        valueDisplay.className = 'badge bg-primary';
+        valueDisplay.id = `dynamic-weight-value-${criterion.replace(/\s+/g, '-')}`;
+        valueDisplay.textContent = weight;
+        
+        labelContainer.appendChild(label);
+        labelContainer.appendChild(valueDisplay);
+        
+        const sliderContainer = document.createElement('div');
+        sliderContainer.className = 'range-container';
+        
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.className = 'form-range';
+        input.min = '1';
+        input.max = '10';
+        input.step = '1';
+        input.value = weight;
+        
+        // Update value display and recalculate results when slider moves
+        input.addEventListener('input', function() {
+            valueDisplay.textContent = this.value;
+            state.decision.weights[criterion] = parseInt(this.value);
+            recalculateResults();
+        });
+        
+        sliderContainer.appendChild(input);
+        
+        // Create tick marks
+        const tickMarks = document.createElement('div');
+        tickMarks.className = 'd-flex justify-content-between px-2 mt-1';
+        for (let i = 1; i <= 10; i++) {
+            const tick = document.createElement('small');
+            tick.className = 'text-muted';
+            tick.textContent = i;
+            tickMarks.appendChild(tick);
+        }
+        
+        field.appendChild(labelContainer);
+        field.appendChild(sliderContainer);
+        field.appendChild(tickMarks);
+        container.appendChild(field);
+    });
+}
+
+// Recalculate results with updated weights
+function recalculateResults() {
+    try {
+        // Calculate weighted scores
+        const results = {};
+        const totalWeights = Object.values(state.decision.weights).reduce((sum, weight) => sum + parseInt(weight), 0);
+        
+        state.decision.alternatives.forEach(alternative => {
+            let totalScore = 0;
+            
+            state.decision.criteria.forEach(criterion => {
+                const score = state.decision.evaluations[alternative]?.[criterion] || 0;
+                const weight = parseInt(state.decision.weights[criterion]) || 0;
+                totalScore += (score * weight) / totalWeights;
+            });
+            
+            results[alternative] = totalScore;
+        });
+        
+        // Update state and display
+        state.decision.results = results;
+        displayResults(results);
+        
+    } catch (error) {
+        logger.error('CALC', 'Error recalculating results', error);
+        showMessage('Error updating results', 'error');
+    }
+}
+
+// Calculate and display initial results
 async function calculateResults() {
     try {
-        logger.log('CALC', 'Calculating results');
+        logger.log('CALC', 'Calculating initial results');
         
         // Get all the evaluation data
         const evaluationData = {};
@@ -1327,122 +1535,6 @@ async function calculateResults() {
         showMessage('Error calculating results', 'error');
     }
 }
-
-// Display results in table and chart
-function displayResults(results) {
-    try {
-        logger.log('DISPLAY', 'Displaying results', results);
-        
-        // Update decision name
-        const decisionNameDisplay = document.getElementById('decision-name-display');
-        if (decisionNameDisplay) {
-            decisionNameDisplay.textContent = state.decision.name;
-        }
-        
-        // Sort alternatives by score
-        const sortedAlternatives = Object.entries(results)
-            .sort(([,a], [,b]) => b - a)
-            .map(([name, score], index) => ({
-                name,
-                score: Math.round(score * 100), // Convert to percentage
-                rank: index + 1
-            }));
-        
-        // Update results table
-        const resultsTable = document.getElementById('results-table');
-        if (resultsTable) {
-            const tbody = resultsTable.querySelector('tbody');
-            tbody.innerHTML = sortedAlternatives.map(alt => `
-                <tr>
-                    <td>${alt.name}</td>
-                    <td>${alt.score}%</td>
-                    <td>#${alt.rank}</td>
-                </tr>
-            `).join('');
-        }
-        
-        // Update chart
-        const ctx = document.getElementById('resultsChart');
-        if (ctx) {
-            if (ctx.chart) {
-                ctx.chart.destroy();
-            }
-            
-            ctx.chart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: sortedAlternatives.map(alt => alt.name),
-                    datasets: [{
-                        label: 'Score (%)',
-                        data: sortedAlternatives.map(alt => alt.score),
-                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            title: {
-                                display: true,
-                                text: 'Score (%)'
-                            }
-                        }
-                    },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return `Score: ${context.parsed.y}%`;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-        
-        // Update criteria and weights list
-        const criteriaList = document.getElementById('criteria-weights-list');
-        if (criteriaList) {
-            criteriaList.innerHTML = state.decision.criteria.map(criterion => `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    ${criterion}
-                    <span class="badge bg-primary rounded-pill">Weight: ${state.decision.weights[criterion]}</span>
-                </li>
-            `).join('');
-        }
-        
-        // Update alternatives list
-        const alternativesList = document.getElementById('alternatives-list');
-        if (alternativesList) {
-            alternativesList.innerHTML = sortedAlternatives.map(alt => `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    ${alt.name}
-                    <span class="badge bg-success rounded-pill">${alt.score}% (#${alt.rank})</span>
-                </li>
-            `).join('');
-        }
-        
-    } catch (error) {
-        logger.error('DISPLAY', 'Error displaying results', error);
-        showMessage('Error displaying results', 'error');
-    }
-}
-
-// Add event listener to evaluation form
-document.addEventListener('DOMContentLoaded', function() {
-    const evaluationForm = document.getElementById('evaluationForm');
-    if (evaluationForm) {
-        evaluationForm.querySelector('button[type="submit"]').addEventListener('click', function(event) {
-            event.preventDefault();
-            calculateResults();
-        });
-    }
-});
 
 // Initialize the application when the DOM is fully loaded
 if (!window.hasInitialized) {
