@@ -44,6 +44,9 @@ const logger = {
     error: function(context, message, error) {
         console.error(`[ERROR][${context}] ${message}`, error || '');
     },
+    warn: function(context, message, data) {
+        console.warn(`[WARN][${context}] ${message}`, data || '');
+    },
     state: function() {
         if (window.debugMode) {
         console.log('[STATE]', JSON.stringify(state, null, 2));
@@ -879,24 +882,33 @@ async function showResults(results, currentState) {
             return;
         }
         
-        // Format the results for display
+        // Format the results for display - ensure scores are between 0 and 100
+        // First find the highest score to normalize others against
+        let maxScore = 0;
+        Object.values(results).forEach(score => {
+            if (score > maxScore) maxScore = score;
+        });
+        
+        // Now normalize and format
         const formattedResults = Object.entries(results).map(([alternative, score]) => {
+            // If max score is 0, avoid division by zero
+            const normalizedScore = maxScore > 0 ? (score / maxScore) * 100 : 0;
             return {
                 alternative,
-                score: typeof score === 'number' ? parseFloat((score * 100).toFixed(1)) : 0
+                score: parseFloat(normalizedScore.toFixed(1))
             };
         }).sort((a, b) => b.score - a.score);
         
         logger.log('RESULTS_DISPLAY', 'Formatted results', formattedResults);
 
         // Display decision name
-        const decisionNameDisplay = document.getElementById('decision-name-display');
-        if (decisionNameDisplay) {
-            decisionNameDisplay.textContent = currentState.name;
+        const resultDecisionName = document.getElementById('resultDecisionName');
+        if (resultDecisionName) {
+            resultDecisionName.textContent = currentState.name;
         }
         
-        // Populate results table
-        const resultsTableBody = document.querySelector('#results-table tbody');
+        // Populate results table - use the correct ID from the HTML
+        const resultsTableBody = document.querySelector('#resultsTable tbody');
         if (!resultsTableBody) {
             logger.error('RESULTS_DISPLAY', 'Results table body element not found');
             showError('UI element not found: results table');
@@ -1454,132 +1466,38 @@ function showMessage(message, type = 'info') {
 
 // Display results in table and chart
 function displayResults(results) {
-    logger.log('RESULTS', 'Displaying results', results);
-    
     try {
-        // Validate results object
-        if (!results || Object.keys(results).length === 0) {
-            logger.error('RESULTS', 'Invalid results object:', results);
+        logger.log('RESULTS_DISPLAY', 'Displaying results', results);
+        
+        // Validate the results object
+        if (!results || typeof results !== 'object' || Object.keys(results).length === 0) {
+            logger.error('RESULTS_DISPLAY', 'Invalid or empty results object', results);
             showError('No valid results to display.');
             return;
         }
         
-        // First, navigate to the results step
+        // Make sure we're on the results step
         updateStep(6);
         
-        // Get the results container
-        const resultsStep = document.getElementById('step6');
-        if (!resultsStep) {
-            logger.error('RESULTS', 'Could not find results step container');
-            showError('Could not find results container. Please try reloading the page.');
-            return;
+        // Display decision name
+        const resultDecisionName = document.getElementById('resultDecisionName');
+        if (resultDecisionName && state.decision.name) {
+            resultDecisionName.textContent = state.decision.name;
         }
         
-        // Update decision name in results
-        const decisionNameDisplay = document.getElementById('resultDecisionName');
-        if (decisionNameDisplay) {
-            decisionNameDisplay.textContent = state.decision.name || 'Your Decision';
-        }
+        // Show the results
+        showResults(results, state.decision);
         
-        // Sort alternatives by score for display
-        const sortedAlternatives = Object.keys(results).sort((a, b) => results[b].score - results[a].score);
-        logger.log('RESULTS', 'Sorted alternatives by score:', sortedAlternatives);
-        
-        // Update results table
-        const resultsTable = document.getElementById('resultsTable');
-        if (!resultsTable) {
-            logger.error('RESULTS', 'Could not find results table element');
-            showError('Results table element not found. Please try reloading the page.');
-            return;
-        }
-        
-        let resultsTableBody = resultsTable.querySelector('tbody');
-        if (!resultsTableBody) {
-            logger.error('RESULTS', 'Could not find results table body');
-            const tbody = document.createElement('tbody');
-            resultsTable.appendChild(tbody);
-            resultsTableBody = tbody;
-        } else {
-            resultsTableBody.innerHTML = '';
-        }
-        
-        // Populate results table
-        sortedAlternatives.forEach((alternative) => {
-            const row = document.createElement('tr');
-            
-            const alternativeCell = document.createElement('td');
-            alternativeCell.textContent = alternative;
-            
-            const scoreCell = document.createElement('td');
-            const percentage = (results[alternative].score * 100).toFixed(1);
-            scoreCell.textContent = `${percentage}%`;
-            
-            const rankCell = document.createElement('td');
-            rankCell.textContent = results[alternative].rank;
-            
-            row.appendChild(alternativeCell);
-            row.appendChild(scoreCell);
-            row.appendChild(rankCell);
-            
-            resultsTableBody.appendChild(row);
-        });
-        
-        // Generate chart
+        // Update the results chart
         updateResultsChart(results);
         
-        // Update results summary
-        const resultsSummary = document.getElementById('resultsSummary');
-        if (resultsSummary) {
-            const bestAlternative = sortedAlternatives[0];
-            const bestScore = (results[bestAlternative].score * 100).toFixed(1);
-            
-            resultsSummary.innerHTML = `
-                <div class="alert alert-success">
-                    <h4>Decision Analysis Complete</h4>
-                    <p>Based on your criteria and evaluations, <strong>${bestAlternative}</strong> is the best option with a score of <strong>${bestScore}%</strong>.</p>
-                </div>
-            `;
-        }
-        
-        // Populate criteria weights list
-        const criteriaWeightsList = document.getElementById('criteria-weights-list');
-        if (criteriaWeightsList) {
-            criteriaWeightsList.innerHTML = '';
-            
-            state.decision.criteria.forEach(criterion => {
-                const weight = state.decision.weights[criterion];
-                const percentage = weight ? (weight * 100).toFixed(0) + '%' : 'N/A';
-                
-                const item = document.createElement('li');
-                item.className = 'list-group-item d-flex justify-content-between align-items-center';
-                item.innerHTML = `
-                    ${criterion}
-                    <span class="badge bg-primary rounded-pill">${percentage}</span>
-                `;
-                criteriaWeightsList.appendChild(item);
-            });
-        }
-        
-        // Populate alternatives list
-        const alternativesList = document.getElementById('alternatives-list');
-        if (alternativesList) {
-            alternativesList.innerHTML = '';
-            
-            state.decision.alternatives.forEach(alternative => {
-                const item = document.createElement('li');
-                item.className = 'list-group-item';
-                item.textContent = alternative;
-                alternativesList.appendChild(item);
-            });
-        }
-        
-        // Set up dynamic weight adjustment sliders
+        // Setup dynamic weight sliders
         setupDynamicWeights(state.decision.criteria, state.decision.weights);
         
-        logger.log('RESULTS', 'Results display completed successfully');
+        logger.log('RESULTS_DISPLAY', 'Results displayed successfully');
     } catch (error) {
-        logger.error('RESULTS', 'Error displaying results:', error);
-        showError('Error displaying results: ' + error.message);
+        logger.error('RESULTS_DISPLAY', 'Error displaying results:', error);
+        showError('An error occurred while displaying results.');
     }
 }
 
@@ -1719,19 +1637,23 @@ function setupDynamicWeights(criteria, initialWeights) {
         // Track if we need to normalize the weights (if they don't sum to 1)
         let totalWeight = 0;
         criteria.forEach(criterion => {
-            totalWeight += initialWeights[criterion] || 0;
+            totalWeight += parseFloat(initialWeights[criterion] || 0);
         });
         
-        if (Math.abs(totalWeight - 1) > 0.01) {
-            logger.warn('WEIGHTS', `Weights don't sum to 1 (${totalWeight}), will normalize`);
-            criteria.forEach(criterion => {
-                initialWeights[criterion] = (initialWeights[criterion] || 0) / totalWeight;
-            });
+        if (totalWeight === 0) {
+            logger.error('WEIGHTS', 'Total weight is zero, cannot normalize');
+            return;
         }
+        
+        // Create a normalized weights object
+        const normalizedWeights = {};
+        criteria.forEach(criterion => {
+            normalizedWeights[criterion] = parseFloat(initialWeights[criterion] || 0) / totalWeight;
+        });
         
         // Create a slider for each criterion
         criteria.forEach(criterion => {
-            const weight = initialWeights[criterion] || (1 / criteria.length);
+            const weight = normalizedWeights[criterion] || (1 / criteria.length);
             const weightPercentage = Math.round(weight * 100);
             
             const sliderContainer = document.createElement('div');
@@ -1839,15 +1761,19 @@ function recalculateResults() {
         // Normalize weights to ensure they sum to 1
         let totalWeight = 0;
         criteria.forEach(criterion => {
-            totalWeight += weights[criterion] || 0;
+            totalWeight += parseFloat(weights[criterion] || 0);
         });
         
-        if (Math.abs(totalWeight - 1) > 0.01) {
-            logger.warn('RESULTS', `Weights don't sum to 1 (${totalWeight}), normalizing`);
-            criteria.forEach(criterion => {
-                weights[criterion] = (weights[criterion] || 0) / totalWeight;
-            });
+        if (totalWeight === 0) {
+            logger.error('RESULTS', 'Total weight is zero, cannot normalize');
+            return;
         }
+        
+        // Create a normalized weights object
+        const normalizedWeights = {};
+        criteria.forEach(criterion => {
+            normalizedWeights[criterion] = parseFloat(weights[criterion] || 0) / totalWeight;
+        });
         
         // Calculate weighted scores for each alternative
         const results = {};
@@ -1862,7 +1788,7 @@ function recalculateResults() {
                 }
                 
                 const score = evaluations[alternative][criterion];
-                const weight = weights[criterion];
+                const weight = normalizedWeights[criterion];
                 
                 totalScore += score * weight;
                 possibleScore += 10 * weight; // 10 is the max score
