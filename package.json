@@ -1,7 +1,7 @@
 {
-  "name": "decision-matrix-app",
+  "name": "thinkflow",
   "version": "1.0.0",
-  "description": "A web application to help users make decisions using a weighted decision matrix approach",
+  "description": "Decision Matrix Application",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -16,20 +16,23 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "bcryptjs": "^3.0.2",
-    "chart.js": "^4.4.8",
+    "bcryptjs": "^2.4.3",
     "connect-flash": "^0.1.1",
-    "ejs": "^3.1.10",
-    "express": "^4.21.2",
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
     "express-ejs-layouts": "^2.5.1",
-    "express-session": "^1.18.1",
-    "node-fetch": "^2.7.0",
-    "passport": "^0.7.0",
+    "express-session": "^1.17.3",
+    "passport": "^0.6.0",
     "passport-local": "^1.0.0",
-    "sequelize": "^6.37.1",
-    "sqlite3": "^5.1.7"
+    "pg": "^8.11.3",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.0.3",
+    "sqlite3": "^5.1.7"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }

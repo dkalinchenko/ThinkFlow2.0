@@ -2,24 +2,47 @@ const { Sequelize, DataTypes } = require('sequelize');
 const path = require('path');
 const logger = require('../utils/logger');
 
-// Initialize Sequelize with SQLite
-const sequelize = new Sequelize({
-  dialect: 'sqlite',
-  storage: path.join(__dirname, '../database.sqlite'),
-  logging: false, // Disable logging SQL queries
-  pool: {
-    max: 10, // Maximum number of connection pool
-    min: 0, // Minimum number of connection pool
-    acquire: 30000, // Maximum time (ms) to acquire a connection
-    idle: 10000 // Maximum time (ms) that a connection can be idle before being released
-  },
-  retry: {
-    max: 3 // Maximum retries when a database query fails
-  },
-  dialectOptions: {
-    timeout: 15000 // Timeout for SQLite operations (ms)
-  }
-});
+// Initialize Sequelize with SQLite for development and PostgreSQL for production
+let sequelize;
+if (process.env.NODE_ENV === 'production') {
+  // Use PostgreSQL in production (Render)
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    dialect: 'postgres',
+    protocol: 'postgres',
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    },
+    logging: false,
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
+    }
+  });
+} else {
+  // Use SQLite in development
+  sequelize = new Sequelize({
+    dialect: 'sqlite',
+    storage: path.join(__dirname, '../database.sqlite'),
+    logging: false,
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
+    },
+    retry: {
+      max: 3
+    },
+    dialectOptions: {
+      timeout: 15000
+    }
+  });
+}
 
 // Test connection
 sequelize
