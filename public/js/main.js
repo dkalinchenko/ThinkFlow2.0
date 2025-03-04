@@ -972,7 +972,9 @@ function prepareEvaluationMatrix(alternatives, criteria) {
             // Create fields for each criterion
             criteria.forEach(criterion => {
                 const field = document.createElement('div');
-                field.className = 'mb-4';
+                field.className = 'mb-4 evaluation-row';
+                field.setAttribute('data-alternative', alternative);
+                field.setAttribute('data-criterion', criterion);
                 
                 const labelContainer = document.createElement('div');
                 labelContainer.className = 'd-flex justify-content-between align-items-center mb-2';
@@ -983,10 +985,13 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 label.setAttribute('for', inputId);
                 label.textContent = criterion;
                 
+                // Get initial value from state or default to 5
+                const initialValue = state.decision.evaluations[alternative]?.[criterion] || 5;
+                
                 const valueDisplay = document.createElement('span');
                 valueDisplay.className = 'badge bg-primary';
                 valueDisplay.id = `${inputId}-value`;
-                valueDisplay.textContent = state.decision.evaluations[alternative]?.[criterion] || '5';
+                valueDisplay.textContent = initialValue;
                 
                 labelContainer.appendChild(label);
                 labelContainer.appendChild(valueDisplay);
@@ -996,20 +1001,34 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 
                 const input = document.createElement('input');
                 input.type = 'range';
-                input.className = 'form-range';
+                input.className = 'form-range evaluation-input';
                 input.id = inputId;
                 input.name = `evaluations[${alternative}][${criterion}]`;
                 input.min = '1';
                 input.max = '10';
                 input.step = '1';
                 input.required = true;
-                input.value = state.decision.evaluations[alternative]?.[criterion] || '5';
+                input.value = initialValue;
+                input.setAttribute('data-alternative', alternative);
+                input.setAttribute('data-criterion', criterion);
+                
+                // Initialize state evaluations object if needed
+                if (!state.decision.evaluations[alternative]) {
+                    state.decision.evaluations[alternative] = {};
+                }
+                state.decision.evaluations[alternative][criterion] = parseInt(initialValue);
                 
                 // Update value display when slider moves
-                input.addEventListener('input', function() {
+                const updateValue = function() {
                     valueDisplay.textContent = this.value;
+                    // Also update state directly
+                    state.decision.evaluations[alternative][criterion] = parseInt(this.value);
                     logger.log('EVALUATION', `Slider value changed: ${alternative}/${criterion} = ${this.value}`);
-                });
+                };
+                
+                // Attach both input and change events for good measure
+                input.addEventListener('input', updateValue);
+                input.addEventListener('change', updateValue);
                 
                 sliderContainer.appendChild(input);
                 
@@ -1039,7 +1058,7 @@ function prepareEvaluationMatrix(alternatives, criteria) {
             }
         });
         
-        // Make sure the form has a submit handler
+        // Get the evaluation form
         const evaluationForm = document.getElementById('evaluationForm');
         if (!evaluationForm) {
             logger.error('EVALUATION', 'Could not find evaluation form element');
@@ -1049,73 +1068,22 @@ function prepareEvaluationMatrix(alternatives, criteria) {
         
         logger.log('EVALUATION', 'Found evaluation form, setting up submit handler');
         
-        // Remove any existing event listeners by cloning the form
-        const newForm = evaluationForm.cloneNode(true);
-        evaluationForm.parentNode.replaceChild(newForm, evaluationForm);
-        
-        // Add the Calculate Results button if it doesn't exist
-        let calculateButton = newForm.querySelector('button[type="submit"]');
-        if (!calculateButton) {
-            calculateButton = document.createElement('button');
+        // Remove any existing event listeners for the calculate button
+        const existingButton = evaluationForm.querySelector('button[type="submit"]');
+        if (existingButton) {
+            const newButton = existingButton.cloneNode(true);
+            existingButton.parentNode.replaceChild(newButton, existingButton);
+            evaluationForm.querySelector('button[type="submit"]').onclick = calculateButtonHandler;
+        } else {
+            // Add the Calculate Results button if it doesn't exist
+            const calculateButton = document.createElement('button');
             calculateButton.type = 'submit';
             calculateButton.className = 'btn btn-primary mt-4';
             calculateButton.textContent = 'Calculate Results';
-            newForm.appendChild(calculateButton);
+            calculateButton.onclick = calculateButtonHandler;
+            evaluationForm.appendChild(calculateButton);
             logger.log('EVALUATION', 'Added Calculate Results button to form');
         }
-        
-        // Add click handler to the Calculate Results button
-        calculateButton.onclick = async function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            logger.log('EVALUATION', 'Calculate Results button clicked');
-            
-            // Collect all evaluation data
-            const evaluations = {};
-            let isValid = true;
-            
-            alternatives.forEach(alternative => {
-                evaluations[alternative] = {};
-                criteria.forEach(criterion => {
-                    const inputId = `eval-${alternative}-${criterion}`;
-                    const input = document.getElementById(inputId);
-                    if (!input) {
-                        logger.error('EVALUATION', `Missing input field: ${inputId}`);
-                        isValid = false;
-                        return;
-                    }
-                    const value = input.value;
-                    if (!value || isNaN(parseInt(value))) {
-                        logger.error('EVALUATION', `Invalid value for ${alternative}/${criterion}: ${value}`);
-                        isValid = false;
-                        return;
-                    }
-                    evaluations[alternative][criterion] = parseInt(value);
-                    logger.log('EVALUATION', `Collected value for ${alternative}/${criterion}: ${value}`);
-                });
-            });
-            
-            if (!isValid) {
-                showError('Please fill in all evaluation fields with valid values (1-10).');
-                return;
-            }
-            
-            logger.log('EVALUATION', 'All evaluations collected:', evaluations);
-            
-            // Update state before submitting
-            state.decision.evaluations = evaluations;
-            saveStateToStorage();
-            
-            logger.log('EVALUATION', 'Updated state with evaluations, submitting form');
-            
-            try {
-                await handleFormSubmit(newForm, 5);
-                logger.log('EVALUATION', 'Form submission completed');
-            } catch (error) {
-                logger.error('EVALUATION', 'Error submitting form:', error);
-                showError('Error submitting evaluations: ' + error.message);
-            }
-        };
         
         logger.log('EVALUATION', 'Submit handler attached successfully');
         return true;
@@ -1130,6 +1098,59 @@ function prepareEvaluationMatrix(alternatives, criteria) {
             </div>
         `;
         return false;
+    }
+}
+
+// Handler for the Calculate Results button
+function calculateButtonHandler(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    logger.log('EVALUATION', 'Calculate Results button clicked');
+    
+    // Collect all evaluation data
+    const evaluations = {};
+    let isValid = true;
+    
+    state.decision.alternatives.forEach(alternative => {
+        evaluations[alternative] = {};
+        state.decision.criteria.forEach(criterion => {
+            const inputId = `eval-${alternative}-${criterion}`;
+            const input = document.getElementById(inputId);
+            if (!input) {
+                logger.error('EVALUATION', `Missing input field: ${inputId}`);
+                isValid = false;
+                return;
+            }
+            const value = input.value;
+            if (!value || isNaN(parseInt(value))) {
+                logger.error('EVALUATION', `Invalid value for ${alternative}/${criterion}: ${value}`);
+                isValid = false;
+                return;
+            }
+            evaluations[alternative][criterion] = parseInt(value);
+            logger.log('EVALUATION', `Collected value for ${alternative}/${criterion}: ${value}`);
+        });
+    });
+    
+    if (!isValid) {
+        showError('Please fill in all evaluation fields with valid values (1-10).');
+        return;
+    }
+    
+    logger.log('EVALUATION', 'All evaluations collected:', evaluations);
+    
+    // Update state before calculating
+    state.decision.evaluations = evaluations;
+    saveStateToStorage();
+    
+    logger.log('EVALUATION', 'Updated state with evaluations, calculating results');
+    
+    try {
+        // Calculate and display results directly
+        calculateResults();
+    } catch (error) {
+        logger.error('EVALUATION', 'Error calculating results:', error);
+        showError('Error calculating results: ' + error.message);
     }
 }
 
@@ -1275,243 +1296,474 @@ function showMessage(message, type = 'info') {
 
 // Display results in table and chart
 function displayResults(results) {
+    logger.log('RESULTS', 'Displaying results', results);
+    
     try {
-        logger.log('DISPLAY', 'Displaying results', results);
-        
-        if (!results || typeof results !== 'object' || Object.keys(results).length === 0) {
-            logger.error('DISPLAY', 'Invalid results object', results);
-            showMessage('Error: No valid results to display', 'error');
+        // Validate results object
+        if (!results || Object.keys(results).length === 0) {
+            logger.error('RESULTS', 'Invalid results object:', results);
+            showError('No valid results to display.');
             return;
         }
         
-        // Update decision name
-        const decisionNameDisplay = document.getElementById('decision-name-display');
-        if (decisionNameDisplay) {
-            decisionNameDisplay.textContent = state.decision.name || 'Unnamed Decision';
-            logger.log('DISPLAY', `Updated decision name: ${state.decision.name}`);
-        } else {
-            logger.warn('DISPLAY', 'Decision name display element not found');
+        // Make results step visible and update step indicators
+        const resultsStep = document.getElementById('step6');
+        if (!resultsStep) {
+            logger.error('RESULTS', 'Could not find results step container');
+            showError('Could not find results container. Please try reloading the page.');
+            return;
         }
         
-        // Sort alternatives by score
-        const sortedAlternatives = Object.entries(results)
-            .sort(([,a], [,b]) => b - a)
-            .map(([name, score], index) => ({
-                name,
-                score: Math.round(score * 100), // Convert to percentage
-                rank: index + 1
-            }));
+        resultsStep.style.display = 'block';
+        const stepIndicator = document.querySelector('.step-indicator[data-step="6"]');
+        if (stepIndicator) {
+            stepIndicator.classList.add('active');
+        }
         
-        logger.log('DISPLAY', 'Sorted alternatives', sortedAlternatives);
+        // Update decision name in results
+        const decisionNameDisplay = document.getElementById('resultDecisionName');
+        if (decisionNameDisplay) {
+            decisionNameDisplay.textContent = state.decision.name || 'Your Decision';
+        }
+        
+        // Sort alternatives by score for display
+        const sortedAlternatives = Object.keys(results).sort((a, b) => results[b].score - results[a].score);
+        logger.log('RESULTS', 'Sorted alternatives by score:', sortedAlternatives);
         
         // Update results table
-        const resultsTable = document.getElementById('results-table');
-        if (resultsTable) {
-            const tbody = resultsTable.querySelector('tbody');
-            if (tbody) {
-                tbody.innerHTML = sortedAlternatives.map(alt => `
-                    <tr>
-                        <td>${alt.name}</td>
-                        <td>${alt.score}%</td>
-                        <td>#${alt.rank}</td>
-                    </tr>
-                `).join('');
-                logger.log('DISPLAY', 'Updated results table');
-            } else {
-                logger.error('DISPLAY', 'Results table body not found');
-            }
+        const resultsTable = document.getElementById('resultsTable');
+        if (!resultsTable) {
+            logger.error('RESULTS', 'Could not find results table element');
+            showError('Results table element not found. Please try reloading the page.');
+            return;
+        }
+        
+        const resultsTableBody = resultsTable.querySelector('tbody');
+        if (!resultsTableBody) {
+            logger.error('RESULTS', 'Could not find results table body');
+            const tbody = document.createElement('tbody');
+            resultsTable.appendChild(tbody);
+            resultsTableBody = tbody;
         } else {
-            logger.error('DISPLAY', 'Results table not found');
+            resultsTableBody.innerHTML = '';
         }
         
-        // Update chart
-        try {
-            updateResultsChart(sortedAlternatives);
-            logger.log('DISPLAY', 'Updated results chart');
-        } catch (chartError) {
-            logger.error('DISPLAY', 'Error updating chart', chartError);
+        // Populate results table
+        sortedAlternatives.forEach((alternative) => {
+            const row = document.createElement('tr');
+            
+            const alternativeCell = document.createElement('td');
+            alternativeCell.textContent = alternative;
+            
+            const scoreCell = document.createElement('td');
+            const percentage = results[alternative].percentage.toFixed(1);
+            scoreCell.textContent = `${percentage}%`;
+            
+            const rankCell = document.createElement('td');
+            rankCell.textContent = results[alternative].rank;
+            
+            row.appendChild(alternativeCell);
+            row.appendChild(scoreCell);
+            row.appendChild(rankCell);
+            
+            resultsTableBody.appendChild(row);
+        });
+        
+        // Generate chart
+        updateResultsChart(results);
+        
+        // Update results summary
+        const resultsSummary = document.getElementById('resultsSummary');
+        if (resultsSummary) {
+            const bestAlternative = sortedAlternatives[0];
+            const bestScore = results[bestAlternative].percentage.toFixed(1);
+            
+            resultsSummary.innerHTML = `
+                <div class="alert alert-success">
+                    <h4>Decision Analysis Complete</h4>
+                    <p>Based on your criteria and evaluations, <strong>${bestAlternative}</strong> is the best option with a score of <strong>${bestScore}%</strong>.</p>
+                </div>
+            `;
         }
         
-        // Update criteria and weights list
-        const criteriaList = document.getElementById('criteria-weights-list');
-        if (criteriaList) {
-            criteriaList.innerHTML = state.decision.criteria.map(criterion => `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    ${criterion}
-                    <span class="badge bg-primary rounded-pill">Weight: ${state.decision.weights[criterion]}</span>
-                </li>
-            `).join('');
-            logger.log('DISPLAY', 'Updated criteria weights list');
-        } else {
-            logger.warn('DISPLAY', 'Criteria weights list element not found');
+        // Ensure criteria weights section is visible
+        const criteriaWeightsSection = document.getElementById('criteriaWeights');
+        if (criteriaWeightsSection) {
+            criteriaWeightsSection.style.display = 'block';
         }
         
-        // Update alternatives list
-        const alternativesList = document.getElementById('alternatives-list');
-        if (alternativesList) {
-            alternativesList.innerHTML = sortedAlternatives.map(alt => `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    ${alt.name}
-                    <span class="badge bg-success rounded-pill">${alt.score}% (#${alt.rank})</span>
-                </li>
-            `).join('');
-            logger.log('DISPLAY', 'Updated alternatives list');
-        } else {
-            logger.warn('DISPLAY', 'Alternatives list element not found');
-        }
+        // Smooth scroll to results section
+        goToStep(6);
         
-        // Set up dynamic weight adjustment
-        try {
-            setupDynamicWeights();
-            logger.log('DISPLAY', 'Set up dynamic weights');
-        } catch (weightsError) {
-            logger.error('DISPLAY', 'Error setting up dynamic weights', weightsError);
-        }
-        
+        logger.log('RESULTS', 'Results display completed successfully');
     } catch (error) {
-        logger.error('DISPLAY', 'Error displaying results', error);
-        showMessage('Error displaying results', 'error');
+        logger.error('RESULTS', 'Error displaying results:', error);
+        showError('Error displaying results: ' + error.message);
     }
 }
 
 // Update results chart
-function updateResultsChart(sortedAlternatives) {
-    const ctx = document.getElementById('resultsChart');
-    if (!ctx) return;
+function updateResultsChart(results) {
+    logger.log('CHART', 'Updating results chart', results);
     
-    if (window.resultsChart) {
-        window.resultsChart.destroy();
-    }
-    
-    window.resultsChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: sortedAlternatives.map(alt => alt.name),
-            datasets: [{
-                label: 'Score (%)',
-                data: sortedAlternatives.map(alt => alt.score),
-                backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
+    try {
+        const chartContainer = document.getElementById('resultsChart');
+        if (!chartContainer) {
+            logger.error('CHART', 'Chart container not found');
+            return;
+        }
+        
+        // If there's an existing chart, destroy it
+        if (window.resultsChartInstance) {
+            logger.log('CHART', 'Destroying existing chart instance');
+            window.resultsChartInstance.destroy();
+        }
+        
+        // Prepare chart data
+        const sortedAlternatives = Object.keys(results).sort((a, b) => results[b].score - results[a].score);
+        
+        const labels = sortedAlternatives;
+        const scores = sortedAlternatives.map(alt => results[alt].percentage.toFixed(1));
+        
+        logger.log('CHART', 'Preparing chart data', { labels, scores });
+        
+        // Create the canvas if it doesn't exist
+        let canvas = chartContainer.querySelector('canvas');
+        if (!canvas) {
+            logger.log('CHART', 'Creating new canvas for chart');
+            canvas = document.createElement('canvas');
+            chartContainer.appendChild(canvas);
+        }
+        
+        // Create the chart
+        const ctx = canvas.getContext('2d');
+        window.resultsChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Score (%)',
+                    data: scores,
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(153, 102, 255, 0.6)',
+                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(255, 206, 86, 0.6)',
+                        'rgba(199, 199, 199, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(199, 199, 199, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Score (%)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Alternatives'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const alternative = context.label;
+                                const score = context.raw;
+                                const rank = results[alternative].rank;
+                                return `Score: ${score}% (Rank: ${rank})`;
+                            }
+                        }
+                    },
+                    legend: {
+                        display: false
+                    },
                     title: {
                         display: true,
-                        text: 'Score (%)'
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `Score: ${context.parsed.y}%`;
+                        text: 'Decision Results',
+                        font: {
+                            size: 16
                         }
                     }
                 }
             }
-        }
-    });
+        });
+        
+        logger.log('CHART', 'Chart created successfully');
+    } catch (error) {
+        logger.error('CHART', 'Error updating chart:', error);
+        showError('Error creating results chart: ' + error.message);
+    }
 }
 
 // Set up dynamic weight adjustment
-function setupDynamicWeights() {
-    const container = document.getElementById('dynamic-weights-container');
-    if (!container) return;
+function setupDynamicWeights(criteria, initialWeights) {
+    logger.log('WEIGHTS', 'Setting up dynamic weights', { criteria, initialWeights });
     
-    container.innerHTML = '';
-    
-    // Create weight sliders for each criterion
-    state.decision.criteria.forEach(criterion => {
-        const weight = state.decision.weights[criterion];
-        
-        const field = document.createElement('div');
-        field.className = 'mb-4';
-        
-        const labelContainer = document.createElement('div');
-        labelContainer.className = 'd-flex justify-content-between align-items-center mb-2';
-        
-        const label = document.createElement('label');
-        label.className = 'form-label mb-0';
-        label.textContent = criterion;
-        
-        const valueDisplay = document.createElement('span');
-        valueDisplay.className = 'badge bg-primary';
-        valueDisplay.id = `dynamic-weight-value-${criterion.replace(/\s+/g, '-')}`;
-        valueDisplay.textContent = weight;
-        
-        labelContainer.appendChild(label);
-        labelContainer.appendChild(valueDisplay);
-        
-        const sliderContainer = document.createElement('div');
-        sliderContainer.className = 'range-container';
-        
-        const input = document.createElement('input');
-        input.type = 'range';
-        input.className = 'form-range';
-        input.min = '1';
-        input.max = '10';
-        input.step = '1';
-        input.value = weight;
-        
-        // Update value display and recalculate results when slider moves
-        input.addEventListener('input', function() {
-            valueDisplay.textContent = this.value;
-            state.decision.weights[criterion] = parseInt(this.value);
-            recalculateResults();
-        });
-        
-        sliderContainer.appendChild(input);
-        
-        // Create tick marks
-        const tickMarks = document.createElement('div');
-        tickMarks.className = 'd-flex justify-content-between px-2 mt-1';
-        for (let i = 1; i <= 10; i++) {
-            const tick = document.createElement('small');
-            tick.className = 'text-muted';
-            tick.textContent = i;
-            tickMarks.appendChild(tick);
+    try {
+        // Get the container for the weight sliders
+        const weightSlidersContainer = document.getElementById('weightSliders');
+        if (!weightSlidersContainer) {
+            logger.error('WEIGHTS', 'Weight sliders container not found');
+            return;
         }
         
-        field.appendChild(labelContainer);
-        field.appendChild(sliderContainer);
-        field.appendChild(tickMarks);
-        container.appendChild(field);
-    });
+        // Clear existing sliders
+        weightSlidersContainer.innerHTML = '';
+        
+        // Ensure we have weights
+        if (!initialWeights || Object.keys(initialWeights).length === 0) {
+            logger.log('WEIGHTS', 'No initial weights provided, using equal weights');
+            initialWeights = {};
+            criteria.forEach(criterion => {
+                initialWeights[criterion] = 1 / criteria.length;
+            });
+        }
+        
+        // Track if we need to normalize the weights (if they don't sum to 1)
+        let totalWeight = 0;
+        criteria.forEach(criterion => {
+            totalWeight += initialWeights[criterion] || 0;
+        });
+        
+        if (Math.abs(totalWeight - 1) > 0.01) {
+            logger.warn('WEIGHTS', `Weights don't sum to 1 (${totalWeight}), will normalize`);
+            criteria.forEach(criterion => {
+                initialWeights[criterion] = (initialWeights[criterion] || 0) / totalWeight;
+            });
+        }
+        
+        // Create a slider for each criterion
+        criteria.forEach(criterion => {
+            const weight = initialWeights[criterion] || (1 / criteria.length);
+            const weightPercentage = Math.round(weight * 100);
+            
+            const sliderContainer = document.createElement('div');
+            sliderContainer.className = 'mb-3';
+            
+            const labelContainer = document.createElement('div');
+            labelContainer.className = 'd-flex justify-content-between align-items-center mb-2';
+            
+            const label = document.createElement('label');
+            label.className = 'form-label mb-0';
+            label.textContent = criterion;
+            
+            const valueDisplay = document.createElement('span');
+            valueDisplay.className = 'badge bg-primary';
+            valueDisplay.id = `weight-${criterion}-value`;
+            valueDisplay.textContent = `${weightPercentage}%`;
+            
+            labelContainer.appendChild(label);
+            labelContainer.appendChild(valueDisplay);
+            
+            const input = document.createElement('input');
+            input.type = 'range';
+            input.className = 'form-range weight-slider';
+            input.id = `weight-${criterion}`;
+            input.min = '0';
+            input.max = '100';
+            input.step = '1';
+            input.value = weightPercentage;
+            input.setAttribute('data-criterion', criterion);
+            
+            // Throttle function to avoid too many recalculations
+            let timeout = null;
+            const throttledUpdate = function() {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    const newWeight = parseInt(this.value) / 100;
+                    valueDisplay.textContent = `${this.value}%`;
+                    
+                    // Update weight in state
+                    state.decision.weights[criterion] = newWeight;
+                    
+                    // Recalculate results with updated weights
+                    recalculateResults();
+                    
+                    logger.log('WEIGHTS', `Updated weight for ${criterion}: ${newWeight}`);
+                }, 100);
+            };
+            
+            input.addEventListener('input', throttledUpdate);
+            
+            sliderContainer.appendChild(labelContainer);
+            sliderContainer.appendChild(input);
+            
+            weightSlidersContainer.appendChild(sliderContainer);
+            logger.log('WEIGHTS', `Created weight slider for ${criterion}: ${weightPercentage}%`);
+        });
+        
+        // Add a "Reset to Equal Weights" button
+        const resetButton = document.createElement('button');
+        resetButton.className = 'btn btn-outline-secondary mt-3';
+        resetButton.textContent = 'Reset to Equal Weights';
+        resetButton.onclick = function() {
+            const equalWeight = 1 / criteria.length;
+            const equalWeightPercentage = Math.round(equalWeight * 100);
+            
+            criteria.forEach(criterion => {
+                const slider = document.getElementById(`weight-${criterion}`);
+                const valueDisplay = document.getElementById(`weight-${criterion}-value`);
+                
+                if (slider && valueDisplay) {
+                    slider.value = equalWeightPercentage;
+                    valueDisplay.textContent = `${equalWeightPercentage}%`;
+                    state.decision.weights[criterion] = equalWeight;
+                }
+            });
+            
+            recalculateResults();
+            logger.log('WEIGHTS', 'Reset to equal weights');
+        };
+        
+        weightSlidersContainer.appendChild(resetButton);
+        logger.log('WEIGHTS', 'Dynamic weights setup completed');
+    } catch (error) {
+        logger.error('WEIGHTS', 'Error setting up dynamic weights:', error);
+        showError('Error setting up weight adjustment sliders: ' + error.message);
+    }
 }
 
 // Recalculate results with updated weights
 function recalculateResults() {
+    logger.log('RESULTS', 'Recalculating results with updated weights');
+    
     try {
-        // Calculate weighted scores
-        const results = {};
-        const totalWeights = Object.values(state.decision.weights).reduce((sum, weight) => sum + parseInt(weight), 0);
+        // Get evaluation data from state
+        const evaluations = state.decision.evaluations;
+        const criteria = state.decision.criteria;
+        const alternatives = state.decision.alternatives;
+        const weights = state.decision.weights;
         
-        state.decision.alternatives.forEach(alternative => {
-            let totalScore = 0;
-            
-            state.decision.criteria.forEach(criterion => {
-                const score = state.decision.evaluations[alternative]?.[criterion] || 0;
-                const weight = parseInt(state.decision.weights[criterion]) || 0;
-                totalScore += (score * weight) / totalWeights;
-            });
-            
-            results[alternative] = totalScore;
+        if (!evaluations || !criteria || !alternatives || !weights) {
+            logger.error('RESULTS', 'Missing required data for recalculation');
+            return;
+        }
+        
+        // Normalize weights to ensure they sum to 1
+        let totalWeight = 0;
+        criteria.forEach(criterion => {
+            totalWeight += weights[criterion] || 0;
         });
         
-        // Update state and display
-        state.decision.results = results;
-        displayResults(results);
+        if (Math.abs(totalWeight - 1) > 0.01) {
+            logger.warn('RESULTS', `Weights don't sum to 1 (${totalWeight}), normalizing`);
+            criteria.forEach(criterion => {
+                weights[criterion] = (weights[criterion] || 0) / totalWeight;
+            });
+        }
         
+        // Calculate weighted scores for each alternative
+        const results = {};
+        alternatives.forEach(alternative => {
+            let totalScore = 0;
+            let possibleScore = 0;
+            
+            criteria.forEach(criterion => {
+                if (!evaluations[alternative] || evaluations[alternative][criterion] === undefined) {
+                    logger.warn('RESULTS', `Missing evaluation for ${alternative}/${criterion}`);
+                    return;
+                }
+                
+                const score = evaluations[alternative][criterion];
+                const weight = weights[criterion];
+                
+                totalScore += score * weight;
+                possibleScore += 10 * weight; // 10 is the max score
+            });
+            
+            // Calculate percentage score
+            results[alternative] = {
+                score: totalScore,
+                percentage: (totalScore / possibleScore) * 100,
+                rank: 0 // Will be set after sorting
+            };
+            
+            logger.log('RESULTS', `Calculated score for ${alternative}: ${totalScore} (${results[alternative].percentage.toFixed(2)}%)`);
+        });
+        
+        // Sort alternatives by score and assign ranks
+        const sortedAlternatives = Object.keys(results).sort((a, b) => results[b].score - results[a].score);
+        sortedAlternatives.forEach((alternative, index) => {
+            results[alternative].rank = index + 1;
+        });
+        
+        // Save results to state
+        state.decision.results = results;
+        saveStateToStorage();
+        
+        // Update the results display without changing the step
+        updateResultsChart(results);
+        
+        // Update results table
+        const resultsTable = document.getElementById('resultsTable');
+        if (resultsTable) {
+            const resultsTableBody = resultsTable.querySelector('tbody');
+            if (resultsTableBody) {
+                resultsTableBody.innerHTML = '';
+                
+                sortedAlternatives.forEach((alternative) => {
+                    const row = document.createElement('tr');
+                    
+                    const alternativeCell = document.createElement('td');
+                    alternativeCell.textContent = alternative;
+                    
+                    const scoreCell = document.createElement('td');
+                    const percentage = results[alternative].percentage.toFixed(1);
+                    scoreCell.textContent = `${percentage}%`;
+                    
+                    const rankCell = document.createElement('td');
+                    rankCell.textContent = results[alternative].rank;
+                    
+                    row.appendChild(alternativeCell);
+                    row.appendChild(scoreCell);
+                    row.appendChild(rankCell);
+                    
+                    resultsTableBody.appendChild(row);
+                });
+            }
+        }
+        
+        // Update results summary
+        const resultsSummary = document.getElementById('resultsSummary');
+        if (resultsSummary) {
+            const bestAlternative = sortedAlternatives[0];
+            const bestScore = results[bestAlternative].percentage.toFixed(1);
+            
+            resultsSummary.innerHTML = `
+                <div class="alert alert-success">
+                    <h4>Decision Analysis Complete</h4>
+                    <p>Based on your criteria and evaluations, <strong>${bestAlternative}</strong> is the best option with a score of <strong>${bestScore}%</strong>.</p>
+                </div>
+            `;
+        }
+        
+        logger.log('RESULTS', 'Results recalculated successfully with updated weights');
+        return results;
     } catch (error) {
-        logger.error('CALC', 'Error recalculating results', error);
-        showMessage('Error updating results', 'error');
+        logger.error('RESULTS', 'Error recalculating results:', error);
+        showError('Error recalculating results: ' + error.message);
+        return null;
     }
 }
 
@@ -1523,63 +1775,92 @@ function goToStep(stepNumber) {
 
 // Calculate and display initial results
 async function calculateResults() {
+    logger.log('RESULTS', 'Calculating initial results');
+    
     try {
-        logger.log('CALC', 'Calculating initial results');
+        // Gather evaluation data from state
+        const evaluations = state.decision.evaluations;
+        const criteria = state.decision.criteria;
+        const alternatives = state.decision.alternatives;
+        const weights = state.decision.weights || {};
         
-        // Get all the evaluation data
-        const evaluationData = {};
+        logger.log('RESULTS', 'Found evaluation data in state:', { evaluations, criteria, alternatives, weights });
         
-        // Collect data from each alternative and criterion
-        state.decision.alternatives.forEach(alternative => {
-            evaluationData[alternative] = {};
-            
-            state.decision.criteria.forEach(criterion => {
-                const inputId = `eval-${alternative}-${criterion}`;
-                const input = document.getElementById(inputId);
-                
-                if (input) {
-                    const score = parseInt(input.value) || 0;
-                    evaluationData[alternative][criterion] = score;
-                    logger.log('CALC', `Collected evaluation: ${alternative}/${criterion} = ${score}`);
-                } else {
-                    logger.warn('CALC', `Input element not found for ${alternative}/${criterion}`);
-                    evaluationData[alternative][criterion] = 5; // Default value if not found
-                }
+        // Ensure we have evaluations
+        if (!evaluations || Object.keys(evaluations).length === 0) {
+            logger.error('RESULTS', 'No evaluation data found in state');
+            showError('No evaluation data found. Please complete the evaluation step first.');
+            return;
+        }
+        
+        // Ensure we have criteria and alternatives
+        if (!criteria || criteria.length === 0 || !alternatives || alternatives.length === 0) {
+            logger.error('RESULTS', 'Missing criteria or alternatives data');
+            showError('Missing criteria or alternatives data. Please complete all previous steps.');
+            return;
+        }
+        
+        // Calculate weights if not already present
+        if (!weights || Object.keys(weights).length === 0) {
+            logger.log('RESULTS', 'No weights found in state, calculating equal weights');
+            state.decision.weights = {};
+            criteria.forEach(criterion => {
+                state.decision.weights[criterion] = 1 / criteria.length;
             });
-        });
+        }
         
-        // Save evaluations to state
-        state.decision.evaluations = evaluationData;
-        
-        // Calculate weighted scores
+        // Calculate weighted scores for each alternative
         const results = {};
-        const totalWeights = Object.values(state.decision.weights).reduce((sum, weight) => sum + parseInt(weight), 0);
-        
-        state.decision.alternatives.forEach(alternative => {
+        alternatives.forEach(alternative => {
             let totalScore = 0;
+            let possibleScore = 0;
             
-            state.decision.criteria.forEach(criterion => {
-                const score = evaluationData[alternative]?.[criterion] || 0;
-                const weight = parseInt(state.decision.weights[criterion]) || 0;
-                totalScore += (score * weight) / totalWeights;
+            criteria.forEach(criterion => {
+                if (!evaluations[alternative] || evaluations[alternative][criterion] === undefined) {
+                    logger.warn('RESULTS', `Missing evaluation for ${alternative}/${criterion}`);
+                    return;
+                }
+                
+                const score = evaluations[alternative][criterion];
+                const weight = weights[criterion];
+                
+                totalScore += score * weight;
+                possibleScore += 10 * weight; // 10 is the max score
             });
             
-            results[alternative] = totalScore;
+            // Calculate percentage score
+            results[alternative] = {
+                score: totalScore,
+                percentage: (totalScore / possibleScore) * 100,
+                rank: 0 // Will be set after sorting
+            };
+            
+            logger.log('RESULTS', `Calculated score for ${alternative}: ${totalScore} (${results[alternative].percentage.toFixed(2)}%)`);
         });
+        
+        // Sort alternatives by score and assign ranks
+        const sortedAlternatives = Object.keys(results).sort((a, b) => results[b].score - results[a].score);
+        sortedAlternatives.forEach((alternative, index) => {
+            results[alternative].rank = index + 1;
+        });
+        
+        logger.log('RESULTS', 'Final calculated results:', results);
         
         // Save results to state
         state.decision.results = results;
         saveStateToStorage();
         
-        // Display results
+        // Display the results
         displayResults(results);
         
-        // Move to results step
-        goToStep(6);
+        // Set up dynamic weights if they don't already exist
+        setupDynamicWeights(criteria, state.decision.weights);
         
+        return results;
     } catch (error) {
-        logger.error('CALC', 'Error calculating results', error);
-        showMessage('Error calculating results', 'error');
+        logger.error('RESULTS', 'Error calculating results:', error);
+        showError('Error calculating results: ' + error.message);
+        return null;
     }
 }
 
