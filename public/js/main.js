@@ -55,12 +55,11 @@ const logger = {
 function initializeApp() {
     logger.log('INIT', 'Initializing application');
     
-    // Define key elements for global access
-    elements = {
-        stepContainers: document.querySelectorAll('.step-container'),
-        stepIndicators: document.querySelectorAll('.step-indicator .step'),
-        forms: document.querySelectorAll('form')
-    };
+    // Update key elements for global access
+    // Instead of reassigning the const elements object, update its properties
+    elements.stepContainers = document.querySelectorAll('.step-container');
+    elements.stepIndicators = document.querySelectorAll('.step-indicator .step');
+    elements.forms = document.querySelectorAll('form');
     
     // Load state from storage
     loadStateFromStorage();
