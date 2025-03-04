@@ -34,30 +34,8 @@ const elements = {
     resultsSummary: document.getElementById('resultsSummary')
 };
 
-// Logger utility
-const logger = {
-    log: function(context, message, data) {
-        if (window.debugMode) {
-            console.log(`[${context}] ${message}`, data || '');
-        }
-    },
-    error: function(context, message, error) {
-        console.error(`[ERROR][${context}] ${message}`, error || '');
-    },
-    state: function() {
-        if (window.debugMode) {
-        console.log('[STATE]', JSON.stringify(state, null, 2));
-        }
-    }
-};
-
 // Initialize the application
 function initializeApp() {
-    logger.log('INIT', 'Application initialization started');
-    
-    // Set debug mode based on URL parameter
-    window.debugMode = new URLSearchParams(window.location.search).has('debug');
-    
     // Try to load state from localStorage
     loadStateFromStorage();
     
@@ -74,7 +52,6 @@ function initializeApp() {
             const hiddenId = nameForm.querySelector('input[name="id"]');
             if (hiddenId) {
                 state.decisionId = hiddenId.value;
-                logger.log('INIT', 'Set initial decision ID from form', state.decisionId);
             }
         }
     }
@@ -94,9 +71,6 @@ function initializeApp() {
     
     // Add event listeners to remove buttons
     setupRemoveButtons();
-    
-    // Log initial state
-    logger.state();
 }
 
 // Load state from localStorage
@@ -110,13 +84,9 @@ function loadStateFromStorage() {
                 state.currentStep = parsedState.currentStep || 1;
                 state.decisionId = parsedState.decisionId;
                 state.decision = parsedState.decision;
-                logger.log('STORAGE', 'Loaded state from localStorage', state);
             }
-        } else {
-            logger.log('STORAGE', 'No saved state found');
         }
     } catch (error) {
-        logger.error('STORAGE', 'Error loading state from localStorage', error);
         resetState();
     }
 }
@@ -125,9 +95,7 @@ function loadStateFromStorage() {
 function saveStateToStorage() {
     try {
         localStorage.setItem('decisionMatrixState', JSON.stringify(state));
-        logger.log('STORAGE', 'State saved to localStorage');
     } catch (error) {
-        logger.error('STORAGE', 'Error saving state to localStorage', error);
     }
 }
 
@@ -144,13 +112,10 @@ function resetState() {
         results: {}
     };
     saveStateToStorage();
-    logger.log('STATE', 'State reset to initial values');
 }
 
 // Setup form handlers
 function setupFormHandlers() {
-    logger.log('SETUP', 'Setting up form handlers');
-    
     // Add event listeners to forms for steps 1-4 (step 5 is handled separately)
     const formIds = ['nameForm', 'criteriaForm', 'weightsForm', 'alternativesForm'];
     
@@ -186,8 +151,6 @@ function replaceButtonWithClone(buttonId) {
 
 // Set up dynamic controls (add criteria, add alternative, new decision)
 function setupDynamicControls() {
-    logger.log('SETUP', 'Setting up dynamic controls');
-    
     // Get buttons
     const addCriteriaBtn = document.getElementById('addCriteriaBtn');
     const addAlternativeBtn = document.getElementById('addAlternativeBtn');
