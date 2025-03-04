@@ -34,8 +34,30 @@ const elements = {
     resultsSummary: document.getElementById('resultsSummary')
 };
 
+// Logger utility
+const logger = {
+    log: function(context, message, data) {
+        if (window.debugMode) {
+            console.log(`[${context}] ${message}`, data || '');
+        }
+    },
+    error: function(context, message, error) {
+        console.error(`[ERROR][${context}] ${message}`, error || '');
+    },
+    state: function() {
+        if (window.debugMode) {
+        console.log('[STATE]', JSON.stringify(state, null, 2));
+        }
+    }
+};
+
 // Initialize the application
 function initializeApp() {
+    logger.log('INIT', 'Application initialization started');
+    
+    // Set debug mode based on URL parameter
+    window.debugMode = new URLSearchParams(window.location.search).has('debug');
+    
     // Try to load state from localStorage
     loadStateFromStorage();
     
@@ -52,6 +74,7 @@ function initializeApp() {
             const hiddenId = nameForm.querySelector('input[name="id"]');
             if (hiddenId) {
                 state.decisionId = hiddenId.value;
+                logger.log('INIT', 'Set initial decision ID from form', state.decisionId);
             }
         }
     }
@@ -71,6 +94,9 @@ function initializeApp() {
     
     // Add event listeners to remove buttons
     setupRemoveButtons();
+    
+    // Log initial state
+    logger.state();
 }
 
 // Load state from localStorage
@@ -84,9 +110,13 @@ function loadStateFromStorage() {
                 state.currentStep = parsedState.currentStep || 1;
                 state.decisionId = parsedState.decisionId;
                 state.decision = parsedState.decision;
+                logger.log('STORAGE', 'Loaded state from localStorage', state);
             }
+        } else {
+            logger.log('STORAGE', 'No saved state found');
         }
     } catch (error) {
+        logger.error('STORAGE', 'Error loading state from localStorage', error);
         resetState();
     }
 }
@@ -95,7 +125,9 @@ function loadStateFromStorage() {
 function saveStateToStorage() {
     try {
         localStorage.setItem('decisionMatrixState', JSON.stringify(state));
+        logger.log('STORAGE', 'State saved to localStorage');
     } catch (error) {
+        logger.error('STORAGE', 'Error saving state to localStorage', error);
     }
 }
 
@@ -112,10 +144,13 @@ function resetState() {
         results: {}
     };
     saveStateToStorage();
+    logger.log('STATE', 'State reset to initial values');
 }
 
 // Setup form handlers
 function setupFormHandlers() {
+    logger.log('SETUP', 'Setting up form handlers');
+    
     // Add event listeners to forms for steps 1-4 (step 5 is handled separately)
     const formIds = ['nameForm', 'criteriaForm', 'weightsForm', 'alternativesForm'];
     
@@ -129,19 +164,7 @@ function setupFormHandlers() {
             // Add the event listener
             newForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
-                const submitButton = newForm.querySelector('button[type="submit"]');
-                if (submitButton) {
-                    submitButton.disabled = true;
-                }
-                try {
-                    await handleFormSubmit(newForm, index + 1);
-                } catch (error) {
-                    showError('Error submitting form: ' + error.message);
-                } finally {
-                    if (submitButton) {
-                        submitButton.disabled = false;
-                    }
-                }
+                await handleFormSubmit(newForm, index + 1);
             });
         }
     });
@@ -163,6 +186,8 @@ function replaceButtonWithClone(buttonId) {
 
 // Set up dynamic controls (add criteria, add alternative, new decision)
 function setupDynamicControls() {
+    logger.log('SETUP', 'Setting up dynamic controls');
+    
     // Get buttons
     const addCriteriaBtn = document.getElementById('addCriteriaBtn');
     const addAlternativeBtn = document.getElementById('addAlternativeBtn');
@@ -176,18 +201,21 @@ function setupDynamicControls() {
     // Add fresh event listeners
     if (newAddCriteriaBtn) {
         newAddCriteriaBtn.addEventListener('click', function(event) {
+            logger.log('CLICK', 'Add criteria button clicked');
             addCriteriaField(event);
         });
     }
     
     if (newAddAlternativeBtn) {
         newAddAlternativeBtn.addEventListener('click', function(event) {
+            logger.log('CLICK', 'Add alternative button clicked');
             addAlternativeField(event);
         });
     }
     
     if (newNewDecisionBtn) {
         newNewDecisionBtn.addEventListener('click', function() {
+            logger.log('CLICK', 'New decision button clicked');
             if (confirm('Are you sure you want to start a new decision? All current data will be lost.')) {
                 window.location.href = '/';
             }
@@ -212,233 +240,214 @@ function initializeDynamicForms() {
 // Handle form submissions
 async function handleFormSubmit(form, step) {
     try {
+        logger.log('SUBMIT', `Handling form submission for step ${step}`, {
+            formId: form.id,
+            formAction: form.action,
+            formMethod: form.method
+        });
+        
         // Ensure we have a decision ID
         if (!state.decisionId) {
             state.decisionId = Date.now().toString();
         }
 
-        const data = {
-            id: state.decisionId
-        };
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Get form data
+        const formData = new FormData(form);
+        let result = {};
 
         // Process form data based on step
         switch (step) {
             case 1: // Name
-                const formData = new FormData(form);
-                const name = formData.get('name');
-                if (!name || name.trim() === '') {
-                    throw new Error('Please enter a decision name');
-                }
-                state.decision.name = name;
-                data.name = name;
+                result = {
+                    name: formData.get('name')
+                };
                 break;
 
             case 2: // Criteria
-                const criteriaFormData = new FormData(form);
-                const criteria = Array.from(criteriaFormData.getAll('criteria[]'))
-                    .filter(c => c.trim())
-                    .map(c => c.trim());
-                
-                if (criteria.length === 0) {
-                    throw new Error('Please add at least one criterion');
+                const criteriaInputs = form.querySelectorAll('input[name="criteria[]"]');
+                const criteria = Array.from(criteriaInputs).map(input => input.value.trim()).filter(Boolean);
+                if (criteria.length < 2) {
+                    showError('Please add at least two criteria');
+                    return;
                 }
-                
-                state.decision.criteria = [...criteria];
-                data.criteria = criteria;
+                result = { criteria };
                 break;
 
             case 3: // Weights
-                if (!state.decision.criteria || !Array.isArray(state.decision.criteria) || state.decision.criteria.length === 0) {
-                    throw new Error('Please define criteria in step 2 first.');
-                }
-
-                const weightsFormData = new FormData(form);
                 const weights = {};
-                
-                for (const criterion of state.decision.criteria) {
-                    const weightInput = weightsFormData.get(`weights[${criterion}]`);
-                    
-                    if (!weightInput) {
-                        throw new Error(`Please enter a weight for ${criterion}`);
+                state.decision.criteria.forEach(criterion => {
+                    const weight = formData.get(`weights[${criterion}]`);
+                    if (weight) {
+                        weights[criterion] = parseInt(weight, 10);
                     }
-                    
-                    const weight = parseInt(weightInput);
-                    if (isNaN(weight) || weight < 1 || weight > 10) {
-                        throw new Error(`Please enter a valid weight (1-10) for ${criterion}`);
-                    }
-                    
-                    weights[criterion] = weight;
-                }
-                
-                state.decision.weights = {...weights};
-                data.weights = weights;
+                });
+                result = { weights };
                 break;
 
             case 4: // Alternatives
-                const alternativesFormData = new FormData(form);
-                const alternatives = Array.from(alternativesFormData.getAll('alternatives[]'))
-                    .filter(a => a.trim())
-                    .map(a => a.trim());
-                
-                if (alternatives.length === 0) {
-                    throw new Error('Please add at least one alternative');
+                const alternativeInputs = form.querySelectorAll('input[name="alternatives[]"]');
+                const alternatives = Array.from(alternativeInputs).map(input => input.value.trim()).filter(Boolean);
+                if (alternatives.length < 2) {
+                    showError('Please add at least two alternatives');
+                    return;
                 }
-                
-                state.decision.alternatives = [...alternatives];
-                data.alternatives = alternatives;
-                break;
-
-            case 5: // Evaluations
-                if (!state.decision.evaluations || Object.keys(state.decision.evaluations).length === 0) {
-                    throw new Error('No evaluation data found. Please rate all alternatives.');
-                }
-                
-                data.evaluations = state.decision.evaluations;
+                result = { alternatives };
                 break;
         }
 
-        // Add current state to all requests
-        data.currentState = state.decision;
+        // Update state with form data
+        updateState(result);
 
-        // Save state to localStorage before sending to server
+        // Save state to storage
         saveStateToStorage();
-        
-        // Send data to server
-        const response = await fetch('/save-step', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                step,
-                data
-            })
-        });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Server error: ${errorText}`);
-        }
+        // Move to next step
+        updateStep(step + 1);
 
-        const result = await response.json();
-        
-        if (result.success) {
-            // Update state with server response
-            updateState(result);
-            
-            // Save updated state to localStorage
-            saveStateToStorage();
-            
-            if (step === 5) {
-                // Make sure we have results
-                if (result.results) {
-                    // Validate results structure
-                    if (typeof result.results !== 'object' || Object.keys(result.results).length === 0) {
-                        throw new Error('Invalid results format. Please try again.');
-                    }
-                    
-                    await showResults(result.results, state.decision);
-                    updateStep(6);
-                } else {
-                    throw new Error('No results were returned. Please try again.');
-                }
-            } else {
-                // Handle special case for step 3 (weights)
-                if (result.nextStep === 3) {
-                    prepareWeightFields(state.decision.criteria);
-                }
-                
-                // Handle special case for step 5 (evaluation matrix)
-                if (result.nextStep === 5) {
-                    prepareEvaluationMatrix(state.decision.alternatives, state.decision.criteria);
-                }
-                
-                // Update UI to show next step
-                updateStep(result.nextStep);
-            }
-        } else {
-            throw new Error(result.error || 'An error occurred');
-        }
+        // Reset form validation state
+        form.classList.remove('was-validated');
+
+        logger.log('SUBMIT', 'Form submission successful', { step, result });
+        return true;
     } catch (error) {
-        throw error;
+        logger.error('SUBMIT', 'Error handling form submission', error);
+        showError('An error occurred while processing your submission. Please try again.');
+        return false;
     }
 }
 
 // Update application state with server response
 function updateState(result) {
-    if (result.currentId) {
-        state.decisionId = result.currentId;
-    }
-    
-    // Update decision state with server response
-    if (result.criteria) {
-        state.decision.criteria = Array.isArray(result.criteria) ? [...result.criteria] : [];
-    }
-    
-    if (result.weights) {
-        state.decision.weights = typeof result.weights === 'object' ? {...result.weights} : {};
-    }
-    
-    if (result.alternatives) {
-        state.decision.alternatives = Array.isArray(result.alternatives) ? [...result.alternatives] : [];
-    }
-    
-    if (result.results) {
-        state.decision.results = {...result.results};
+    logger.log('STATE', 'Updating state with result', result);
+
+    // Update state based on result properties
+    if (result.name) {
+        // Step 1: Update name and initialize decision
+        state.decision = {
+            name: result.name,
+            criteria: [],
+            weights: {},
+            alternatives: [],
+            evaluations: {},
+            results: {}
+        };
     }
 
-    // Update current step
-    if (result.nextStep) {
-        state.currentStep = result.nextStep;
+    if (result.criteria) {
+        // Step 2: Update criteria and initialize weights
+        state.decision.criteria = [...result.criteria];
+        state.decision.weights = {};
+        result.criteria.forEach(criterion => {
+            state.decision.weights[criterion] = 5; // Default weight
+        });
     }
+
+    if (result.weights) {
+        // Step 3: Update weights
+        state.decision.weights = { ...result.weights };
+    }
+
+    if (result.alternatives) {
+        // Step 4: Update alternatives and initialize evaluations
+        state.decision.alternatives = [...result.alternatives];
+        state.decision.evaluations = {};
+        result.alternatives.forEach(alternative => {
+            state.decision.evaluations[alternative] = {};
+            state.decision.criteria.forEach(criterion => {
+                state.decision.evaluations[alternative][criterion] = 5; // Default score
+            });
+        });
+    }
+
+    if (result.evaluations) {
+        // Step 5: Update evaluations
+        state.decision.evaluations = { ...result.evaluations };
+    }
+
+    if (result.results) {
+        // Step 6: Update results
+        state.decision.results = { ...result.results };
+    }
+
+    logger.log('STATE', 'State updated', state);
+    saveStateToStorage();
 }
 
 // Update UI to show the specified step
 function updateStep(newStep) {
-    // Update step containers
-    const allStepContainers = document.querySelectorAll('.step-container');
-    
-    allStepContainers.forEach(container => {
-        container.classList.remove('active');
-    });
-    
-    const nextStepContainer = document.querySelector(`#step${newStep}`);
-    if (!nextStepContainer) {
-        showError('Could not find the next step container. Please try reloading the page.');
+    logger.log('STEP', `Updating step to ${newStep}`);
+
+    // Validate step number
+    if (newStep < 1 || newStep > 6) {
+        logger.error('STEP', `Invalid step number: ${newStep}`);
         return;
     }
-    
-    nextStepContainer.classList.add('active');
 
-    // Update step indicators
-    const stepLinks = document.querySelectorAll('.step-link');
-    stepLinks.forEach((stepLink, index) => {
-        const step = stepLink.querySelector('.step');
-        if (index + 1 <= newStep) {
-            step.classList.add('active');
+    // Check if we can navigate to this step
+    if (!canNavigateToStep(newStep)) {
+        logger.error('STEP', `Cannot navigate to step ${newStep} - prerequisites not met`);
+        return;
+    }
+
+    // Update state
+    state.currentStep = newStep;
+    saveStateToStorage();
+
+    // Update UI
+    elements.stepContainers.forEach((container, index) => {
+        if (index + 1 === newStep) {
+            container.classList.add('active');
         } else {
-            step.classList.remove('active');
+            container.classList.remove('active');
         }
     });
 
-    // Update current step in state
-    state.currentStep = newStep;
-    saveStateToStorage();
-    
-    // Special handling for step 5
-    if (newStep === 5) {
-        prepareEvaluationMatrix(state.decision.alternatives, state.decision.criteria);
+    elements.stepIndicators.forEach((indicator, index) => {
+        if (index + 1 <= newStep) {
+            indicator.classList.add('active');
+        } else {
+            indicator.classList.remove('active');
+        }
+    });
+
+    // Special handling for different steps
+    switch (newStep) {
+        case 3:
+            prepareWeightFields(state.decision.criteria);
+            break;
+        case 5:
+            prepareEvaluationMatrix(state.decision.alternatives, state.decision.criteria);
+            break;
+        case 6:
+            if (state.decision.results) {
+                showResults(state.decision.results, state.decision);
+            }
+            break;
     }
+
+    logger.log('STEP', `Step updated to ${newStep}`);
 }
 
 // Prepare weight fields for step 3
 function prepareWeightFields(criteria) {
+    logger.log('WEIGHTS', 'Preparing weight fields for criteria', criteria);
+    
     // Check if criteria exist
     if (!criteria || !Array.isArray(criteria) || criteria.length === 0) {
+        logger.error('WEIGHTS', 'No criteria available to create weight fields');
         return false;
     }
     
     // Get the weights form container
     const weightsFormContainer = document.getElementById('step3');
     if (!weightsFormContainer) {
+        logger.error('WEIGHTS', 'Could not find step3 container');
         return false;
     }
     
@@ -464,14 +473,14 @@ function prepareWeightFields(criteria) {
         explanation.textContent = 'How important is each criterion? Slide to set importance (1-10)';
         form.appendChild(explanation);
         
-        // Create fields container
-        const fieldsContainer = document.createElement('div');
-        fieldsContainer.className = 'weight-fields-container';
-        form.appendChild(fieldsContainer);
-        
-        // Create weight fields for each criterion
-        criteria.forEach(criterion => {
-            const field = document.createElement('div');
+            // Create fields container
+            const fieldsContainer = document.createElement('div');
+            fieldsContainer.className = 'weight-fields-container';
+            form.appendChild(fieldsContainer);
+            
+            // Create weight fields for each criterion
+            criteria.forEach(criterion => {
+                const field = document.createElement('div');
             field.className = 'mb-4 weight-field';
             
             const labelContainer = document.createElement('div');
@@ -524,24 +533,26 @@ function prepareWeightFields(criteria) {
             field.appendChild(labelContainer);
             field.appendChild(sliderContainer);
             field.appendChild(tickMarks);
-            fieldsContainer.appendChild(field);
-        });
-        
-        // Add submit button
-        const submitBtn = document.createElement('button');
-        submitBtn.type = 'submit';
+                fieldsContainer.appendChild(field);
+            });
+            
+            // Add submit button
+            const submitBtn = document.createElement('button');
+            submitBtn.type = 'submit';
         submitBtn.className = 'btn btn-primary mt-3';
-        submitBtn.textContent = 'Continue to Step 4';
-        form.appendChild(submitBtn);
-        
-        // Attach submit event listener
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            await handleFormSubmit(form, 3);
-        });
-        
-        return true;
+            submitBtn.textContent = 'Continue to Step 4';
+            form.appendChild(submitBtn);
+            
+            // Attach submit event listener
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                await handleFormSubmit(form, 3);
+            });
+            
+        logger.log('WEIGHTS', 'Successfully created weight fields with sliders');
+            return true;
     } catch (error) {
+        logger.error('WEIGHTS', 'Error creating weight fields', error);
         weightsFormContainer.innerHTML = `
             <div class="alert alert-danger">
                 <h4>Error Creating Form</h4>
@@ -559,8 +570,11 @@ function addCriteriaField(event) {
         event.preventDefault();
     }
     
+    logger.log('ACTION', 'Adding a single criteria field');
+    
     const criteriaList = document.getElementById('criteriaList');
     if (!criteriaList) {
+        logger.error('Could not find criteriaList element');
         return;
     }
     
@@ -599,8 +613,11 @@ function addAlternativeField(event) {
         event.preventDefault();
     }
     
+    logger.log('ACTION', 'Adding a single alternative field');
+    
     const alternativesList = document.getElementById('alternativesList');
     if (!alternativesList) {
+        logger.error('Could not find alternativesList element');
         return;
     }
     
@@ -636,14 +653,18 @@ function addAlternativeField(event) {
 // Show results
 async function showResults(results, currentState) {
     try {
+        logger.log('RESULTS_DISPLAY', 'Processing results for display', results);
+        
         // Validate results and current state
         if (!results || typeof results !== 'object') {
+            logger.error('RESULTS_DISPLAY', 'Invalid results object', results);
             showError('Invalid results data structure');
             return;
         }
         
         if (!currentState || !currentState.name || !Array.isArray(currentState.alternatives) || 
             !Array.isArray(currentState.criteria) || !currentState.weights) {
+            logger.error('RESULTS_DISPLAY', 'Invalid current state', currentState);
             showError('Invalid decision state data');
             return;
         }
@@ -655,6 +676,8 @@ async function showResults(results, currentState) {
                 score: typeof score === 'number' ? parseFloat((score * 100).toFixed(1)) : 0
             };
         }).sort((a, b) => b.score - a.score);
+        
+        logger.log('RESULTS_DISPLAY', 'Formatted results', formattedResults);
 
         // Display decision name
         const decisionNameDisplay = document.getElementById('decision-name-display');
@@ -665,6 +688,7 @@ async function showResults(results, currentState) {
         // Populate results table
         const resultsTableBody = document.querySelector('#results-table tbody');
         if (!resultsTableBody) {
+            logger.error('RESULTS_DISPLAY', 'Results table body element not found');
             showError('UI element not found: results table');
             return;
         }
@@ -710,13 +734,14 @@ async function showResults(results, currentState) {
                 alternativesList.appendChild(li);
             });
         } else {
-            showError('UI element not found: alternatives list');
+            logger.warn('RESULTS_DISPLAY', 'Alternatives list element not found');
         }
     
     // Create chart
         try {
             await createResultsChart(formattedResults);
         } catch (chartError) {
+            logger.error('RESULTS_DISPLAY', 'Error creating chart', chartError);
             // Don't fail the whole results display if just the chart fails
         }
         
@@ -732,6 +757,12 @@ async function showResults(results, currentState) {
                     if (!state.decisionId) {
                         throw new Error('Decision ID is missing');
                     }
+
+                    logger.log('SAVE', 'Saving decision to account', {
+                        decisionId: state.decisionId,
+                        name: currentState.name,
+                        state: state
+                    });
 
                     const saveData = {
                         decisionId: state.decisionId,
@@ -758,6 +789,7 @@ async function showResults(results, currentState) {
                         throw new Error(result.error || 'Failed to save decision');
                     }
                 } catch (error) {
+                    logger.error('SAVE', 'Error saving decision', error);
                     showError('Error saving decision: ' + error.message);
                 }
             });
@@ -774,39 +806,51 @@ async function showResults(results, currentState) {
             });
         }
     } catch (error) {
+        logger.error('RESULTS_DISPLAY', 'Error displaying results', error);
         showError('Error displaying results: ' + error.message);
     }
 }
 
 // Create results chart
 function createResultsChart(formattedResults) {
+    logger.log('CHART', 'Starting chart creation', formattedResults);
+    
     return new Promise((resolve, reject) => {
         // First check if Chart is defined
         if (typeof Chart === 'undefined') {
-            reject(new Error('Chart.js is not loaded'));
+            const error = new Error('Chart.js is not loaded');
+            logger.error('CHART', 'Chart.js not found', error);
+            reject(error);
             return;
         }
 
         if (!Array.isArray(formattedResults) || formattedResults.length === 0) {
-            reject(new Error('Invalid or empty results for chart'));
+            const error = new Error('Invalid or empty results for chart');
+            logger.error('CHART', 'Invalid data for chart creation', error);
+            reject(error);
             return;
         }
         
         const chartCanvas = document.getElementById('resultsChart');
         if (!chartCanvas) {
-            reject(new Error('Chart canvas element not found'));
+            const error = new Error('Chart canvas element not found');
+            logger.error('CHART', 'Canvas element not found', error);
+            reject(error);
             return;
         }
         
         try {
             // Check if there's an existing chart and destroy it
             if (window.resultsChart instanceof Chart) {
+                logger.log('CHART', 'Destroying existing chart');
                 window.resultsChart.destroy();
             }
             
             // Prepare data for chart
             const labels = formattedResults.map(result => result.alternative);
             const data = formattedResults.map(result => result.score);
+            
+            logger.log('CHART', 'Chart data prepared', { labels, data });
             
             // Define colors with opacity
             const backgroundColors = [
@@ -866,9 +910,11 @@ function createResultsChart(formattedResults) {
                 }
             });
             
+            logger.log('CHART', 'Chart created successfully');
             resolve(window.resultsChart);
             
         } catch (error) {
+            logger.error('CHART', 'Error creating chart', error);
             reject(error);
         }
     });
@@ -885,13 +931,17 @@ function showError(message) {
 
 // Prepare evaluation matrix for step 5
 function prepareEvaluationMatrix(alternatives, criteria) {
+    logger.log('EVALUATION', 'Preparing evaluation matrix', { alternatives, criteria });
+    
     // Check if alternatives and criteria exist
     if (!alternatives || !Array.isArray(alternatives) || alternatives.length === 0) {
+        logger.error('EVALUATION', 'No alternatives available to create evaluation matrix');
         showError('No alternatives available. Please complete step 4 first.');
         return false;
     }
     
     if (!criteria || !Array.isArray(criteria) || criteria.length === 0) {
+        logger.error('EVALUATION', 'No criteria available to create evaluation matrix');
         showError('No criteria available. Please complete step 2 first.');
         return false;
     }
@@ -899,6 +949,7 @@ function prepareEvaluationMatrix(alternatives, criteria) {
     // Get the evaluation matrix container
     const evaluationMatrix = document.getElementById('evaluationMatrix');
     if (!evaluationMatrix) {
+        logger.error('EVALUATION', 'Could not find evaluationMatrix container');
         showError('Could not find evaluation matrix container. Please try reloading the page.');
         return false;
     }
@@ -954,6 +1005,7 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 // Update value display when slider moves
                 input.addEventListener('input', function() {
                     valueDisplay.textContent = this.value;
+                    logger.log('EVALUATION', `Slider value changed: ${alternative}/${criterion} = ${this.value}`);
                 });
                 
                 sliderContainer.appendChild(input);
@@ -972,6 +1024,8 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 field.appendChild(sliderContainer);
                 field.appendChild(tickMarks);
                 evaluationMatrix.appendChild(field);
+                
+                logger.log('EVALUATION', `Created evaluation field for ${alternative}/${criterion}`);
             });
             
             // Add divider after each alternative except the last one
@@ -985,9 +1039,12 @@ function prepareEvaluationMatrix(alternatives, criteria) {
         // Make sure the form has a submit handler
         const evaluationForm = document.getElementById('evaluationForm');
         if (!evaluationForm) {
+            logger.error('EVALUATION', 'Could not find evaluation form element');
             showError('Could not find evaluation form. Please try reloading the page.');
             return false;
         }
+        
+        logger.log('EVALUATION', 'Found evaluation form, setting up submit handler');
         
         // Remove any existing event listeners by cloning the form
         const newForm = evaluationForm.cloneNode(true);
@@ -1001,12 +1058,14 @@ function prepareEvaluationMatrix(alternatives, criteria) {
             calculateButton.className = 'btn btn-primary mt-4';
             calculateButton.textContent = 'Calculate Results';
             newForm.appendChild(calculateButton);
+            logger.log('EVALUATION', 'Added Calculate Results button to form');
         }
         
         // Add click handler to the Calculate Results button
         calculateButton.onclick = async function(event) {
             event.preventDefault();
             event.stopPropagation();
+            logger.log('EVALUATION', 'Calculate Results button clicked');
             
             // Collect all evaluation data
             const evaluations = {};
@@ -1018,15 +1077,18 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                     const inputId = `eval-${alternative}-${criterion}`;
                     const input = document.getElementById(inputId);
                     if (!input) {
+                        logger.error('EVALUATION', `Missing input field: ${inputId}`);
                         isValid = false;
                         return;
                     }
                     const value = input.value;
                     if (!value || isNaN(parseInt(value))) {
+                        logger.error('EVALUATION', `Invalid value for ${alternative}/${criterion}: ${value}`);
                         isValid = false;
                         return;
                     }
                     evaluations[alternative][criterion] = parseInt(value);
+                    logger.log('EVALUATION', `Collected value for ${alternative}/${criterion}: ${value}`);
                 });
             });
             
@@ -1035,20 +1097,28 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 return;
             }
             
+            logger.log('EVALUATION', 'All evaluations collected:', evaluations);
+            
             // Update state before submitting
             state.decision.evaluations = evaluations;
             saveStateToStorage();
             
+            logger.log('EVALUATION', 'Updated state with evaluations, submitting form');
+            
             try {
                 await handleFormSubmit(newForm, 5);
+                logger.log('EVALUATION', 'Form submission completed');
             } catch (error) {
+                logger.error('EVALUATION', 'Error submitting form:', error);
                 showError('Error submitting evaluations: ' + error.message);
             }
         };
         
+        logger.log('EVALUATION', 'Submit handler attached successfully');
         return true;
         
     } catch (error) {
+        logger.error('EVALUATION', 'Error creating evaluation matrix', error);
         evaluationMatrix.innerHTML = `
             <div class="alert alert-danger">
                 <h4>Error Creating Evaluation Matrix</h4>
