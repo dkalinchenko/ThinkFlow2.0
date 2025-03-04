@@ -156,7 +156,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server with explicit error handling
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log(`[INFO][SERVER] Decision Matrix App is running on port ${port}`);
     console.log(`[INFO][SERVER] http://localhost:${port}`);
 });
@@ -164,33 +164,33 @@ app.listen(port, () => {
 // Handle server errors
 server.on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
-    logger.error('SERVER', `Port ${port} is already in use`);
+        logger.error('SERVER', `Port ${port} is already in use`);
     } else {
-    logger.error('SERVER', 'Server error', error);
+        logger.error('SERVER', 'Server error', error);
     }
     process.exit(1);
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  logger.error('SERVER', 'Uncaught exception', error);
-  // Give the server a chance to send any pending responses before exiting
-  setTimeout(() => {
-    process.exit(1);
-  }, 1000);
+    logger.error('SERVER', 'Uncaught exception', error);
+    // Give the server a chance to send any pending responses before exiting
+    setTimeout(() => {
+        process.exit(1);
+    }, 1000);
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('SERVER', 'Unhandled promise rejection', { reason });
-  // Keep the process running but log the error
+    logger.error('SERVER', 'Unhandled promise rejection', { reason });
+    // Keep the process running but log the error
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  logger.info('SERVER', 'Shutting down gracefully');
+    logger.info('SERVER', 'Shutting down gracefully');
     server.close(() => {
-    logger.info('SERVER', 'Server closed');
+        logger.info('SERVER', 'Server closed');
         process.exit(0);
     });
 });
