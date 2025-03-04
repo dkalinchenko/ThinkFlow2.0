@@ -16,9 +16,13 @@ const port = process.env.PORT || 3333;
 require('./config/passport')(passport);
 
 // Initialize database
-initDatabase().catch(err => {
-  logger.error('APP', 'Failed to initialize database', err);
-  process.exit(1);
+initDatabase()
+  .then(() => {
+    logger.info('DATABASE', 'Successfully initialized database');
+  })
+  .catch(err => {
+    logger.error('DATABASE', 'Failed to initialize database', err);
+    process.exit(1);
 });
 
 // Middleware
@@ -85,6 +89,11 @@ app.use(expressLayouts);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('layout', 'layout');
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Routes
 app.get('/', async (req, res) => {
@@ -156,7 +165,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server with explicit error handling
-const server = app.listen(port, () => {
+const server = app.listen(port, '0.0.0.0', () => {
     console.log(`[INFO][SERVER] Decision Matrix App is running on port ${port}`);
     console.log(`[INFO][SERVER] http://localhost:${port}`);
 });
