@@ -4,7 +4,7 @@
  */
 
 // State management
-const state = {
+let state = {
     currentStep: 1,
     decisionId: null,
     decision: {
