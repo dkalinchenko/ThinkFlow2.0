@@ -1,0 +1,100 @@
+<!-- Blog Post Page -->
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <article>
+                <!-- Post Header -->
+                <header class="text-center mb-5">
+                    <h1 class="display-4 mb-3"><%= post.title %></h1>
+                    <div class="text-muted mb-4">
+                        <% if (post.date) { %>
+                            <span class="me-3">
+                                <i class="far fa-calendar-alt me-1"></i>
+                                <%= new Date(post.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %>
+                            </span>
+                        <% } %>
+                        <% if (post.author) { %>
+                            <span>
+                                <i class="far fa-user me-1"></i>
+                                <%= post.author %>
+                            </span>
+                        <% } %>
+                    </div>
+                </header>
+
+                <!-- Post Content -->
+                <div class="blog-content">
+                    <%- post.content %>
+                </div>
+
+                <!-- Share Section -->
+                <div class="border-top mt-5 pt-4">
+                    <h3 class="h5 mb-3">Share this article</h3>
+                    <div class="d-flex gap-2">
+                        <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(`${process.env.BASE_URL}/blog/${post.slug}`) %>&text=<%= encodeURIComponent(post.title) %>" 
+                           target="_blank" 
+                           class="btn btn-outline-primary">
+                            <i class="fab fa-twitter me-2"></i>Twitter
+                        </a>
+                        <a href="https://www.linkedin.com/shareArticle?mini=true&url=<%= encodeURIComponent(`${process.env.BASE_URL}/blog/${post.slug}`) %>&title=<%= encodeURIComponent(post.title) %>" 
+                           target="_blank" 
+                           class="btn btn-outline-primary">
+                            <i class="fab fa-linkedin me-2"></i>LinkedIn
+                        </a>
+                        <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(`${process.env.BASE_URL}/blog/${post.slug}`) %>" 
+                           target="_blank" 
+                           class="btn btn-outline-primary">
+                            <i class="fab fa-facebook me-2"></i>Facebook
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="mt-5">
+                    <a href="/blog" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Blog
+                    </a>
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+
+<!-- Add some custom styles for the blog content -->
+<style>
+    .blog-content {
+        font-size: 1.1rem;
+        line-height: 1.7;
+    }
+    .blog-content h2 {
+        font-size: 1.8rem;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+    }
+    .blog-content h3 {
+        font-size: 1.4rem;
+        margin-top: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    .blog-content p {
+        margin-bottom: 1.2rem;
+    }
+    .blog-content ul, .blog-content ol {
+        margin-bottom: 1.2rem;
+        padding-left: 2rem;
+    }
+    .blog-content li {
+        margin-bottom: 0.5rem;
+    }
+    .blog-content img {
+        max-width: 100%;
+        height: auto;
+        margin: 2rem 0;
+    }
+    .blog-content blockquote {
+        border-left: 4px solid #dee2e6;
+        padding-left: 1rem;
+        margin: 1.5rem 0;
+        font-style: italic;
+    }
+</style> 

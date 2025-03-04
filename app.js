@@ -10,6 +10,9 @@ const decisionService = require('./services/decisionService');
 const logger = require('./utils/logger');
 const { checkAuthenticated } = require('./middleware/auth');
 
+// Import website routes
+const websiteRoutes = require('./routes/website');
+
 const app = express();
 const port = process.env.PORT || 3333;
 
@@ -102,6 +105,25 @@ app.use(expressLayouts);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('layout', 'layout');
+
+// Set default layout
+app.set('view options', { layout: 'layout' });
+
+// Website routes (should be before the app routes)
+app.use('/', websiteRoutes);
+
+// Redirect /app to the decision matrix tool
+app.get('/app', (req, res) => {
+    res.render('index', { 
+        layout: 'layout',
+        title: 'New Decision',
+        step: 1,
+        decisions: {},
+        currentId: null,
+        isAuthenticated: req.isAuthenticated(),
+        user: req.user
+    });
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
