@@ -311,9 +311,34 @@ function setupDynamicControls() {
         newDecisionBtn.addEventListener('click', function() {
             logger.log('CLICK', 'New decision button clicked');
             if (confirm('Are you sure you want to start a new decision? All current data will be lost.')) {
+                logger.log('NAVIGATION', 'Starting new decision');
+                
+                // Destroy any existing chart instance
+                if (window.resultsChartInstance) {
+                    logger.log('CHART', 'Destroying chart for new decision');
+                    window.resultsChartInstance.destroy();
+                    window.resultsChartInstance = null;
+                }
+                
+                // Reset the state completely
                 resetState();
+                
+                // Ensure we're going to step 1
+                logger.log('NAVIGATION', 'Navigating to step 1');
+                
+                // Need to explicitly update the UI first
+                document.querySelectorAll('.step-container').forEach((container, index) => {
+                    if (index + 1 === 1) {
+                        container.classList.add('active');
+                    } else {
+                        container.classList.remove('active');
+                    }
+                });
+                
+                // Then update state
                 updateStep(1);
-                logger.log('DECISION', 'Started new decision');
+                
+                logger.log('NAVIGATION', 'New decision started');
             }
         });
     }
@@ -1511,6 +1536,13 @@ function updateResultsChart(results) {
     }
     
     try {
+        // Always destroy any existing chart instance first
+        if (window.resultsChartInstance) {
+            logger.log('CHART', 'Destroying existing chart instance');
+            window.resultsChartInstance.destroy();
+            window.resultsChartInstance = null;
+        }
+        
         // Get chart container
         const chartContainer = document.getElementById('resultsChartContainer');
         if (!chartContainer) {
@@ -1518,26 +1550,33 @@ function updateResultsChart(results) {
             return;
         }
         
-        // Get existing chart if any
+        // Get or create the canvas element
         let chartCanvas = document.getElementById('resultsChart');
-        
-        // If there's an existing chart instance, destroy it first
-        if (window.resultsChartInstance) {
-            window.resultsChartInstance.destroy();
-            window.resultsChartInstance = null;
-        }
         
         // If canvas doesn't exist, create it
         if (!chartCanvas) {
+            logger.log('CHART', 'Creating new chart canvas');
+            chartCanvas = document.createElement('canvas');
+            chartCanvas.id = 'resultsChart';
+            // Clear the container before adding the new canvas
+            chartContainer.innerHTML = '';
+            chartContainer.appendChild(chartCanvas);
+        } else {
+            // If canvas exists, clear the container and recreate it
+            logger.log('CHART', 'Replacing existing chart canvas');
+            chartContainer.innerHTML = '';
             chartCanvas = document.createElement('canvas');
             chartCanvas.id = 'resultsChart';
             chartContainer.appendChild(chartCanvas);
         }
         
         // Sort alternatives by score
-        const sortedAlternatives = Object.keys(results).sort((a, b) => 
-            results[b].score - results[a].score
-        );
+        const sortedAlternatives = Object.keys(results).sort((a, b) => {
+            // Make sure we're comparing actual numbers
+            const scoreA = typeof results[a].score === 'number' ? results[a].score : 0;
+            const scoreB = typeof results[b].score === 'number' ? results[b].score : 0;
+            return scoreB - scoreA;
+        });
         
         // Prepare data for chart
         const labels = sortedAlternatives;
