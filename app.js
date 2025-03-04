@@ -46,23 +46,22 @@ app.use((req, res, next) => {
 
 // Express session
 app.use(session({
-  secret: 'decision_matrix_secret',
+  secret: process.env.SESSION_SECRET || 'decision_matrix_secret',
   resave: false,
   saveUninitialized: false,
   cookie: { 
     maxAge: 1000 * 60 * 60 * 24, // 1 day
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production'
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
   },
-  // Auto-remove expired sessions to prevent memory leaks
+  name: 'sessionId', // Custom name for better security
   rolling: true
 }));
 
-// Passport middleware
+// Move passport and flash middleware AFTER session middleware
 app.use(passport.initialize());
 app.use(passport.session());
-
-// Connect flash
 app.use(flash());
 
 // Global variables
