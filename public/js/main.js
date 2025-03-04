@@ -957,6 +957,11 @@ function prepareEvaluationMatrix(alternatives, criteria) {
         return false;
     }
     
+    // Initialize the evaluations object in state if it doesn't exist
+    if (!state.decision.evaluations) {
+        state.decision.evaluations = {};
+    }
+    
     try {
         // Clear the container
         evaluationMatrix.innerHTML = '';
@@ -968,6 +973,11 @@ function prepareEvaluationMatrix(alternatives, criteria) {
             heading.className = 'mt-4 mb-3';
             heading.textContent = alternative;
             evaluationMatrix.appendChild(heading);
+            
+            // Initialize alternative in state if needed
+            if (!state.decision.evaluations[alternative]) {
+                state.decision.evaluations[alternative] = {};
+            }
             
             // Create fields for each criterion
             criteria.forEach(criterion => {
@@ -986,7 +996,7 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 label.textContent = criterion;
                 
                 // Get initial value from state or default to 5
-                const initialValue = state.decision.evaluations[alternative]?.[criterion] || 5;
+                const initialValue = state.decision.evaluations[alternative][criterion] || 5;
                 
                 const valueDisplay = document.createElement('span');
                 valueDisplay.className = 'badge bg-primary';
@@ -997,7 +1007,7 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 labelContainer.appendChild(valueDisplay);
                 
                 const sliderContainer = document.createElement('div');
-                sliderContainer.className = 'range-container';
+                sliderContainer.className = 'range-container w-100';
                 
                 const input = document.createElement('input');
                 input.type = 'range';
@@ -1012,10 +1022,7 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 input.setAttribute('data-alternative', alternative);
                 input.setAttribute('data-criterion', criterion);
                 
-                // Initialize state evaluations object if needed
-                if (!state.decision.evaluations[alternative]) {
-                    state.decision.evaluations[alternative] = {};
-                }
+                // Store the initial value in state
                 state.decision.evaluations[alternative][criterion] = parseInt(initialValue);
                 
                 // Update value display when slider moves
@@ -1032,125 +1039,69 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 
                 sliderContainer.appendChild(input);
                 
-                // Create tick marks for the slider (optional)
-                const tickMarks = document.createElement('div');
-                tickMarks.className = 'd-flex justify-content-between px-2 mt-1';
-                for (let i = 1; i <= 10; i++) {
-                    const tick = document.createElement('small');
-                    tick.className = 'text-muted';
-                    tick.textContent = i;
-                    tickMarks.appendChild(tick);
-                }
-                
                 field.appendChild(labelContainer);
                 field.appendChild(sliderContainer);
-                field.appendChild(tickMarks);
                 evaluationMatrix.appendChild(field);
-                
-                logger.log('EVALUATION', `Created evaluation field for ${alternative}/${criterion}`);
             });
-            
-            // Add divider after each alternative except the last one
-            if (alternative !== alternatives[alternatives.length - 1]) {
-                const divider = document.createElement('hr');
-                divider.className = 'my-4';
-                evaluationMatrix.appendChild(divider);
-            }
         });
         
-        // Get the evaluation form
-        const evaluationForm = document.getElementById('evaluationForm');
-        if (!evaluationForm) {
-            logger.error('EVALUATION', 'Could not find evaluation form element');
-            showError('Could not find evaluation form. Please try reloading the page.');
-            return false;
-        }
-        
-        logger.log('EVALUATION', 'Found evaluation form, setting up submit handler');
-        
-        // Remove any existing event listeners for the calculate button
-        const existingButton = evaluationForm.querySelector('button[type="submit"]');
-        if (existingButton) {
-            const newButton = existingButton.cloneNode(true);
-            existingButton.parentNode.replaceChild(newButton, existingButton);
-            evaluationForm.querySelector('button[type="submit"]').onclick = calculateButtonHandler;
-        } else {
-            // Add the Calculate Results button if it doesn't exist
-            const calculateButton = document.createElement('button');
+        // Add the submit button if it doesn't exist or replace it if it does
+        let calculateButton = document.querySelector('#evaluationForm button[type="submit"]');
+        if (!calculateButton) {
+            calculateButton = document.createElement('button');
             calculateButton.type = 'submit';
-            calculateButton.className = 'btn btn-primary mt-4';
+            calculateButton.className = 'btn btn-primary';
             calculateButton.textContent = 'Calculate Results';
-            calculateButton.onclick = calculateButtonHandler;
-            evaluationForm.appendChild(calculateButton);
-            logger.log('EVALUATION', 'Added Calculate Results button to form');
+            document.getElementById('evaluationForm').appendChild(calculateButton);
+        } else {
+            // Clone and replace to remove any existing event handlers
+            const newButton = calculateButton.cloneNode(true);
+            newButton.textContent = 'Calculate Results';
+            calculateButton.parentNode.replaceChild(newButton, calculateButton);
+            calculateButton = newButton;
         }
         
-        logger.log('EVALUATION', 'Submit handler attached successfully');
-        return true;
+        // Add the event handler to the button
+        calculateButton.addEventListener('click', calculateButtonHandler);
         
+        logger.log('EVALUATION', 'Successfully created evaluation matrix');
+        return true;
     } catch (error) {
-        logger.error('EVALUATION', 'Error creating evaluation matrix', error);
-        evaluationMatrix.innerHTML = `
-            <div class="alert alert-danger">
-                <h4>Error Creating Evaluation Matrix</h4>
-                <p>${error.message}</p>
-                <button class="btn btn-primary" onclick="window.location.reload()">Reload Page</button>
-            </div>
-        `;
+        logger.error('EVALUATION', 'Error creating evaluation matrix:', error);
+        showError('Error creating evaluation matrix: ' + error.message);
         return false;
     }
 }
 
 // Handler for the Calculate Results button
 function calculateButtonHandler(event) {
+    logger.log('EVALUATION', 'Calculate button clicked');
     event.preventDefault();
-    event.stopPropagation();
-    logger.log('EVALUATION', 'Calculate Results button clicked');
-    
-    // Collect all evaluation data
-    const evaluations = {};
-    let isValid = true;
-    
-    state.decision.alternatives.forEach(alternative => {
-        evaluations[alternative] = {};
-        state.decision.criteria.forEach(criterion => {
-            const inputId = `eval-${alternative}-${criterion}`;
-            const input = document.getElementById(inputId);
-            if (!input) {
-                logger.error('EVALUATION', `Missing input field: ${inputId}`);
-                isValid = false;
-                return;
-            }
-            const value = input.value;
-            if (!value || isNaN(parseInt(value))) {
-                logger.error('EVALUATION', `Invalid value for ${alternative}/${criterion}: ${value}`);
-                isValid = false;
-                return;
-            }
-            evaluations[alternative][criterion] = parseInt(value);
-            logger.log('EVALUATION', `Collected value for ${alternative}/${criterion}: ${value}`);
-        });
-    });
-    
-    if (!isValid) {
-        showError('Please fill in all evaluation fields with valid values (1-10).');
-        return;
-    }
-    
-    logger.log('EVALUATION', 'All evaluations collected:', evaluations);
-    
-    // Update state before calculating
-    state.decision.evaluations = evaluations;
-    saveStateToStorage();
-    
-    logger.log('EVALUATION', 'Updated state with evaluations, calculating results');
     
     try {
-        // Calculate and display results directly
+        // Collect evaluation data
+        const evaluations = state.decision.evaluations;
+        
+        // Validate evaluations
+        if (!evaluations || Object.keys(evaluations).length === 0) {
+            logger.error('EVALUATION', 'No evaluation data collected');
+            showError('Please evaluate all alternatives first.');
+            return;
+        }
+        
+        logger.log('EVALUATION', 'Collected evaluations:', evaluations);
+        
+        // Update state and calculate results
+        updateState({
+            step: 6,
+            evaluations: evaluations
+        });
+        
+        // Calculate and display results
         calculateResults();
     } catch (error) {
-        logger.error('EVALUATION', 'Error calculating results:', error);
-        showError('Error calculating results: ' + error.message);
+        logger.error('EVALUATION', 'Error handling evaluation calculation:', error);
+        showError('An error occurred while calculating results. Please try again.');
     }
 }
 
@@ -1306,18 +1257,15 @@ function displayResults(results) {
             return;
         }
         
-        // Make results step visible and update step indicators
+        // First, navigate to the results step
+        updateStep(6);
+        
+        // Get the results container
         const resultsStep = document.getElementById('step6');
         if (!resultsStep) {
             logger.error('RESULTS', 'Could not find results step container');
             showError('Could not find results container. Please try reloading the page.');
             return;
-        }
-        
-        resultsStep.style.display = 'block';
-        const stepIndicator = document.querySelector('.step-indicator[data-step="6"]');
-        if (stepIndicator) {
-            stepIndicator.classList.add('active');
         }
         
         // Update decision name in results
@@ -1338,7 +1286,7 @@ function displayResults(results) {
             return;
         }
         
-        const resultsTableBody = resultsTable.querySelector('tbody');
+        let resultsTableBody = resultsTable.querySelector('tbody');
         if (!resultsTableBody) {
             logger.error('RESULTS', 'Could not find results table body');
             const tbody = document.createElement('tbody');
@@ -1406,37 +1354,51 @@ function displayResults(results) {
 function updateResultsChart(results) {
     logger.log('CHART', 'Updating results chart', results);
     
+    if (!results || Object.keys(results).length === 0) {
+        logger.error('CHART', 'No results data provided to update chart');
+        return;
+    }
+    
     try {
-        const chartContainer = document.getElementById('resultsChart');
+        // Get chart container
+        const chartContainer = document.getElementById('resultsChartContainer');
         if (!chartContainer) {
-            logger.error('CHART', 'Chart container not found');
+            logger.error('CHART', 'Chart container element not found');
             return;
         }
         
-        // If there's an existing chart, destroy it
+        // Get existing chart if any
+        let chartCanvas = document.getElementById('resultsChart');
+        
+        // If there's an existing chart instance, destroy it first
         if (window.resultsChartInstance) {
-            logger.log('CHART', 'Destroying existing chart instance');
             window.resultsChartInstance.destroy();
+            window.resultsChartInstance = null;
         }
         
-        // Prepare chart data
-        const sortedAlternatives = Object.keys(results).sort((a, b) => results[b].score - results[a].score);
+        // If canvas doesn't exist, create it
+        if (!chartCanvas) {
+            chartCanvas = document.createElement('canvas');
+            chartCanvas.id = 'resultsChart';
+            chartContainer.appendChild(chartCanvas);
+        }
         
+        // Sort alternatives by score
+        const sortedAlternatives = Object.keys(results).sort((a, b) => 
+            results[b].score - results[a].score
+        );
+        
+        // Prepare data for chart
         const labels = sortedAlternatives;
-        const scores = sortedAlternatives.map(alt => results[alt].percentage.toFixed(1));
+        const scores = sortedAlternatives.map(alt => (results[alt].score * 100).toFixed(1));
+        const backgroundColors = sortedAlternatives.map((_, index) => {
+            if (index === 0) return 'rgba(40, 167, 69, 0.7)'; // First (best) is green
+            if (index === sortedAlternatives.length - 1) return 'rgba(220, 53, 69, 0.7)'; // Last is red
+            return 'rgba(0, 123, 255, 0.7)'; // Others are blue
+        });
         
-        logger.log('CHART', 'Preparing chart data', { labels, scores });
-        
-        // Create the canvas if it doesn't exist
-        let canvas = chartContainer.querySelector('canvas');
-        if (!canvas) {
-            logger.log('CHART', 'Creating new canvas for chart');
-            canvas = document.createElement('canvas');
-            chartContainer.appendChild(canvas);
-        }
-        
-        // Create the chart
-        const ctx = canvas.getContext('2d');
+        // Create chart
+        const ctx = chartCanvas.getContext('2d');
         window.resultsChartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -1444,30 +1406,34 @@ function updateResultsChart(results) {
                 datasets: [{
                     label: 'Score (%)',
                     data: scores,
-                    backgroundColor: [
-                        'rgba(75, 192, 192, 0.6)',
-                        'rgba(54, 162, 235, 0.6)',
-                        'rgba(153, 102, 255, 0.6)',
-                        'rgba(255, 159, 64, 0.6)',
-                        'rgba(255, 99, 132, 0.6)',
-                        'rgba(255, 206, 86, 0.6)',
-                        'rgba(199, 199, 199, 0.6)'
-                    ],
-                    borderColor: [
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(255, 159, 64, 1)',
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(199, 199, 199, 1)'
-                    ],
+                    backgroundColor: backgroundColors,
+                    borderColor: backgroundColors.map(color => color.replace('0.7', '1')),
                     borderWidth: 1
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const rank = results[context.label].rank;
+                                return `Score: ${context.raw}% (Rank: ${rank})`;
+                            }
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Decision Results',
+                        font: {
+                            size: 16
+                        }
+                    }
+                },
                 scales: {
                     y: {
                         beginAtZero: true,
@@ -1483,36 +1449,13 @@ function updateResultsChart(results) {
                             text: 'Alternatives'
                         }
                     }
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const alternative = context.label;
-                                const score = context.raw;
-                                const rank = results[alternative].rank;
-                                return `Score: ${score}% (Rank: ${rank})`;
-                            }
-                        }
-                    },
-                    legend: {
-                        display: false
-                    },
-                    title: {
-                        display: true,
-                        text: 'Decision Results',
-                        font: {
-                            size: 16
-                        }
-                    }
                 }
             }
         });
         
         logger.log('CHART', 'Chart created successfully');
     } catch (error) {
-        logger.error('CHART', 'Error updating chart:', error);
-        showError('Error creating results chart: ' + error.message);
+        logger.error('CHART', 'Error creating results chart:', error);
     }
 }
 

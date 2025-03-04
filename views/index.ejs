@@ -174,15 +174,15 @@
                 <div class="col-lg-8">
                     <div class="card">
                         <div class="card-header bg-primary text-white">
-                            <h3 class="card-title mb-0">Decision: <span id="decision-name-display"></span></h3>
+                            <h3 class="card-title mb-0">Decision: <span id="resultDecisionName"></span></h3>
                         </div>
                         <div class="card-body">
-                            <div class="results-chart">
+                            <div id="resultsChartContainer" class="results-chart" style="height: 300px;">
                                 <canvas id="resultsChart"></canvas>
                             </div>
                             
                             <div class="table-responsive mt-4">
-                                <table class="table table-striped" id="results-table">
+                                <table class="table table-striped" id="resultsTable">
                                     <thead>
                                         <tr>
                                             <th>Alternative</th>
