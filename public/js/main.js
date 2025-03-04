@@ -251,304 +251,187 @@ async function handleFormSubmit(form, step) {
             state.decisionId = Date.now().toString();
         }
 
-        const data = {
-            id: state.decisionId
-        };
-        
-        logger.log('SUBMIT', 'Current state before processing:', {
-            currentStep: state.currentStep,
-            decisionId: state.decisionId,
-            decision: state.decision
-        });
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Get form data
+        const formData = new FormData(form);
+        let result = {};
 
         // Process form data based on step
         switch (step) {
             case 1: // Name
-                const formData = new FormData(form);
-                const name = formData.get('name');
-                
-                // Initialize new decision state
-                state.decision = {
-                    name: name,
-                    criteria: [],
-                    weights: {},
-                    alternatives: [],
-                    evaluations: {},
-                    results: {}
+                result = {
+                    name: formData.get('name')
                 };
-                
-                // Prepare data for server
-                data.name = name;
                 break;
 
             case 2: // Criteria
-                const criteriaFormData = new FormData(form);
-                const criteria = Array.from(criteriaFormData.getAll('criteria[]'))
-                    .filter(c => c.trim())
-                    .map(c => c.trim());
-                
-                if (criteria.length === 0) {
-                    showError('Please add at least one criterion');
+                const criteriaInputs = form.querySelectorAll('input[name="criteria[]"]');
+                const criteria = Array.from(criteriaInputs).map(input => input.value.trim()).filter(Boolean);
+                if (criteria.length < 2) {
+                    showError('Please add at least two criteria');
                     return;
                 }
-                
-                // Store criteria in state
-                state.decision.criteria = [...criteria];
-                
-                // Initialize weights with default values
-                state.decision.weights = {};
-                criteria.forEach(criterion => {
-                    state.decision.weights[criterion] = 5;
-                });
-                
-                // Prepare data for server
-                data.criteria = criteria;
+                result = { criteria };
                 break;
 
             case 3: // Weights
-                if (!state.decision.criteria || !Array.isArray(state.decision.criteria) || state.decision.criteria.length === 0) {
-                    showError('Please define criteria in step 2 first.');
-                    return;
-                }
-
-                const weightsFormData = new FormData(form);
                 const weights = {};
-                
-                for (const criterion of state.decision.criteria) {
-                    const weightInput = weightsFormData.get(`weights[${criterion}]`);
-                    
-                    if (!weightInput) {
-                        showError(`Please enter a weight for ${criterion}`);
-                        return;
+                state.decision.criteria.forEach(criterion => {
+                    const weight = formData.get(`weights[${criterion}]`);
+                    if (weight) {
+                        weights[criterion] = parseInt(weight, 10);
                     }
-                    
-                    const weight = parseInt(weightInput);
-                    if (isNaN(weight) || weight < 1 || weight > 10) {
-                        showError(`Please enter a valid weight (1-10) for ${criterion}`);
-                        return;
-                    }
-                    
-                    weights[criterion] = weight;
-                }
-                
-                // Store weights in state
-                state.decision.weights = {...weights};
-                
-                // Prepare data for server
-                data.weights = weights;
+                });
+                result = { weights };
                 break;
 
             case 4: // Alternatives
-                const alternativesFormData = new FormData(form);
-                const alternatives = Array.from(alternativesFormData.getAll('alternatives[]'))
-                    .filter(a => a.trim())
-                    .map(a => a.trim());
-                
-                if (alternatives.length === 0) {
-                    showError('Please add at least one alternative');
+                const alternativeInputs = form.querySelectorAll('input[name="alternatives[]"]');
+                const alternatives = Array.from(alternativeInputs).map(input => input.value.trim()).filter(Boolean);
+                if (alternatives.length < 2) {
+                    showError('Please add at least two alternatives');
                     return;
                 }
-                
-                // Store alternatives in state
-                state.decision.alternatives = [...alternatives];
-                
-                // Initialize evaluations
-                state.decision.evaluations = {};
-                alternatives.forEach(alternative => {
-                    state.decision.evaluations[alternative] = {};
-                    state.decision.criteria.forEach(criterion => {
-                        state.decision.evaluations[alternative][criterion] = 5;
-                    });
-                });
-                
-                // Prepare data for server
-                data.alternatives = alternatives;
-                break;
-
-            case 5: // Evaluations
-                if (!state.decision.evaluations || Object.keys(state.decision.evaluations).length === 0) {
-                    showError('No evaluation data found. Please rate all alternatives.');
-                    return;
-                }
-                
-                // For step 5, we use the evaluations already stored in state
-                data.evaluations = state.decision.evaluations;
+                result = { alternatives };
                 break;
         }
 
-        // Add current state to all requests
-        data.currentState = state.decision;
+        // Update state with form data
+        updateState(result);
 
-        // Save state to localStorage before sending to server
+        // Save state to storage
         saveStateToStorage();
 
-        logger.log('SUBMIT', 'Sending data to server', {
-            step, 
-            data
-        });
-        
-        // Send data to server
-        const response = await fetch('/save-step', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                step,
-                data
-            })
-        });
+        // Move to next step
+        updateStep(step + 1);
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            logger.error('SUBMIT', `Server returned status ${response.status}`, errorText);
-            throw new Error(`Server error: ${errorText}`);
-        }
+        // Reset form validation state
+        form.classList.remove('was-validated');
 
-        const result = await response.json();
-        logger.log('SUBMIT', 'Server response', result);
-        
-        if (result.success) {
-            // Update state with server response
-            updateState(result);
-            
-            // Save updated state to localStorage
-            saveStateToStorage();
-            
-            if (step === 5) {
-                logger.log('SUBMIT', 'Processing step 5 response');
-                // Make sure we have results
-                if (result.results) {
-                    logger.log('RESULTS', 'Results received from server', result.results);
-                    
-                    // Validate results structure
-                    if (typeof result.results !== 'object' || Object.keys(result.results).length === 0) {
-                        logger.error('RESULTS', 'Invalid results format', result.results);
-                        showError('Invalid results format. Please try again.');
-                        return;
-                    }
-                    
-                    // Check if any alternatives are missing from results
-                    const missingAlternatives = state.decision.alternatives.filter(
-                        alt => !Object.keys(result.results).includes(alt)
-                    );
-                    
-                    if (missingAlternatives.length > 0) {
-                        logger.error('RESULTS', 'Missing alternatives in results', missingAlternatives);
-                        showError(`Missing results for alternatives: ${missingAlternatives.join(', ')}. Please try again.`);
-                        return;
-                    }
-                    
-                    logger.log('RESULTS', 'Showing results', result.results);
-                    await showResults(result.results, state.decision);
-                    updateStep(6);
-                } else {
-                    logger.error('RESULTS', 'No results in response', result);
-                    showError('No results were returned. Please try again.');
-                }
-            } else {
-                // Handle special case for step 3 (weights)
-                if (result.nextStep === 3) {
-                    logger.log('TRANSITION', 'Preparing weight form for step 3');
-                    prepareWeightFields(state.decision.criteria);
-                }
-                
-                // Handle special case for step 5 (evaluation matrix)
-                if (result.nextStep === 5) {
-                    logger.log('TRANSITION', 'Preparing evaluation matrix for step 5');
-                    prepareEvaluationMatrix(state.decision.alternatives, state.decision.criteria);
-                }
-                
-                // Update UI to show next step
-                updateStep(result.nextStep);
-            }
-        } else {
-            logger.error('SUBMIT', 'Error response from server', result);
-            showError(result.error || 'An error occurred');
-        }
+        logger.log('SUBMIT', 'Form submission successful', { step, result });
+        return true;
     } catch (error) {
-        logger.error('SUBMIT', 'Error submitting form', error);
-        showError('An error occurred. Please try again.');
+        logger.error('SUBMIT', 'Error handling form submission', error);
+        showError('An error occurred while processing your submission. Please try again.');
+        return false;
     }
 }
 
 // Update application state with server response
 function updateState(result) {
-    logger.log('STATE', 'Updating state with server response');
-    
-    if (result.currentId) {
-        state.decisionId = result.currentId;
-    }
-    
-    // Update decision state with server response
-    if (result.criteria) {
-        state.decision.criteria = Array.isArray(result.criteria) ? [...result.criteria] : [];
-    }
-    
-    if (result.weights) {
-        state.decision.weights = typeof result.weights === 'object' ? {...result.weights} : {};
-    }
-    
-    if (result.alternatives) {
-        state.decision.alternatives = Array.isArray(result.alternatives) ? [...result.alternatives] : [];
-    }
-    
-    if (result.results) {
-        state.decision.results = {...result.results};
+    logger.log('STATE', 'Updating state with result', result);
+
+    // Update state based on result properties
+    if (result.name) {
+        // Step 1: Update name and initialize decision
+        state.decision = {
+            name: result.name,
+            criteria: [],
+            weights: {},
+            alternatives: [],
+            evaluations: {},
+            results: {}
+        };
     }
 
-    // Update current step
-    if (result.nextStep) {
-        state.currentStep = result.nextStep;
+    if (result.criteria) {
+        // Step 2: Update criteria and initialize weights
+        state.decision.criteria = [...result.criteria];
+        state.decision.weights = {};
+        result.criteria.forEach(criterion => {
+            state.decision.weights[criterion] = 5; // Default weight
+        });
     }
-    
-    logger.state();
+
+    if (result.weights) {
+        // Step 3: Update weights
+        state.decision.weights = { ...result.weights };
+    }
+
+    if (result.alternatives) {
+        // Step 4: Update alternatives and initialize evaluations
+        state.decision.alternatives = [...result.alternatives];
+        state.decision.evaluations = {};
+        result.alternatives.forEach(alternative => {
+            state.decision.evaluations[alternative] = {};
+            state.decision.criteria.forEach(criterion => {
+                state.decision.evaluations[alternative][criterion] = 5; // Default score
+            });
+        });
+    }
+
+    if (result.evaluations) {
+        // Step 5: Update evaluations
+        state.decision.evaluations = { ...result.evaluations };
+    }
+
+    if (result.results) {
+        // Step 6: Update results
+        state.decision.results = { ...result.results };
+    }
+
+    logger.log('STATE', 'State updated', state);
+    saveStateToStorage();
 }
 
 // Update UI to show the specified step
 function updateStep(newStep) {
-    logger.log('UI', `Updating to step ${newStep}`);
+    logger.log('STEP', `Updating step to ${newStep}`);
 
-    // Update step containers
-    const allStepContainers = document.querySelectorAll('.step-container');
-    logger.log('UI', `Found ${allStepContainers.length} step containers`);
-    
-    allStepContainers.forEach(container => {
-        container.classList.remove('active');
-        logger.log('UI', `Removed active class from container: ${container.id}`);
-    });
-    
-    const nextStepContainer = document.querySelector(`#step${newStep}`);
-    if (!nextStepContainer) {
-        logger.error('UI', `Could not find container for step ${newStep}`);
-        showError('Could not find the next step container. Please try reloading the page.');
+    // Validate step number
+    if (newStep < 1 || newStep > 6) {
+        logger.error('STEP', `Invalid step number: ${newStep}`);
         return;
     }
-    
-    logger.log('UI', `Activating step container: ${nextStepContainer.id}`);
-    nextStepContainer.classList.add('active');
 
-    // Update step indicators
-    const stepLinks = document.querySelectorAll('.step-link');
-    stepLinks.forEach((stepLink, index) => {
-        const step = stepLink.querySelector('.step');
-        if (index + 1 <= newStep) {
-            step.classList.add('active');
-            logger.log('UI', `Activated step indicator ${index + 1}`);
+    // Check if we can navigate to this step
+    if (!canNavigateToStep(newStep)) {
+        logger.error('STEP', `Cannot navigate to step ${newStep} - prerequisites not met`);
+        return;
+    }
+
+    // Update state
+    state.currentStep = newStep;
+    saveStateToStorage();
+
+    // Update UI
+    elements.stepContainers.forEach((container, index) => {
+        if (index + 1 === newStep) {
+            container.classList.add('active');
         } else {
-            step.classList.remove('active');
-            logger.log('UI', `Deactivated step indicator ${index + 1}`);
+            container.classList.remove('active');
         }
     });
 
-    // Update current step in state
-    state.currentStep = newStep;
-    saveStateToStorage();
-    logger.log('UI', `Updated state.currentStep to ${newStep}`);
-    
-    // Special handling for step 5
-    if (newStep === 5) {
-        logger.log('UI', 'Preparing evaluation matrix for step 5');
-        prepareEvaluationMatrix(state.decision.alternatives, state.decision.criteria);
+    elements.stepIndicators.forEach((indicator, index) => {
+        if (index + 1 <= newStep) {
+            indicator.classList.add('active');
+        } else {
+            indicator.classList.remove('active');
+        }
+    });
+
+    // Special handling for different steps
+    switch (newStep) {
+        case 3:
+            prepareWeightFields(state.decision.criteria);
+            break;
+        case 5:
+            prepareEvaluationMatrix(state.decision.alternatives, state.decision.criteria);
+            break;
+        case 6:
+            if (state.decision.results) {
+                showResults(state.decision.results, state.decision);
+            }
+            break;
     }
+
+    logger.log('STEP', `Step updated to ${newStep}`);
 }
 
 // Prepare weight fields for step 3
