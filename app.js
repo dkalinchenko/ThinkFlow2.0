@@ -4,7 +4,8 @@ const expressLayouts = require('express-ejs-layouts');
 const session = require('express-session');
 const passport = require('passport');
 const flash = require('connect-flash');
-const { initDatabase } = require('./models');
+const { initDatabase, sequelize } = require('./models');
+const SequelizeStore = require('connect-session-sequelize')(session.Store);
 const decisionService = require('./services/decisionService');
 const logger = require('./utils/logger');
 const { checkAuthenticated } = require('./middleware/auth');
@@ -44,8 +45,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// Express session
+// Session store
+const sessionStore = new SequelizeStore({
+  db: sequelize,
+  tableName: 'Sessions'
+});
+
+// Express session with enhanced security
 app.use(session({
+  store: sessionStore,
   secret: process.env.SESSION_SECRET || 'decision_matrix_secret',
   resave: false,
   saveUninitialized: false,
@@ -56,8 +64,12 @@ app.use(session({
     sameSite: 'lax'
   },
   name: 'sessionId', // Custom name for better security
-  rolling: true
+  rolling: true, // Refresh session with each request
+  proxy: process.env.NODE_ENV === 'production' // Trust the reverse proxy in production
 }));
+
+// Create session table
+sessionStore.sync();
 
 // Move passport and flash middleware AFTER session middleware
 app.use(passport.initialize());
@@ -71,6 +83,15 @@ app.use((req, res, next) => {
   res.locals.error = req.flash('error');
   res.locals.user = req.user || null;
   res.locals.isAuthenticated = req.isAuthenticated();
+  
+  // Log authentication status for debugging
+  logger.debug('AUTH', 'Request authentication status', {
+    isAuthenticated: req.isAuthenticated(),
+    hasUser: !!req.user,
+    sessionID: req.sessionID,
+    path: req.path
+  });
+  
   next();
 });
 

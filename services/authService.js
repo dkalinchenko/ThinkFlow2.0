@@ -13,9 +13,12 @@ class AuthService {
    */
   async registerUser(userData) {
     try {
+      logger.debug('AUTH_SERVICE', 'Starting user registration', { username: userData.username, email: userData.email });
+
       // Check if username already exists
       const existingUsername = await User.findOne({ where: { username: userData.username } });
       if (existingUsername) {
+        logger.debug('AUTH_SERVICE', 'Username already exists', { username: userData.username });
         return {
           success: false,
           error: 'Username already exists'
@@ -25,6 +28,7 @@ class AuthService {
       // Check if email already exists
       const existingEmail = await User.findOne({ where: { email: userData.email } });
       if (existingEmail) {
+        logger.debug('AUTH_SERVICE', 'Email already exists', { email: userData.email });
         return {
           success: false,
           error: 'Email already exists'
@@ -46,13 +50,17 @@ class AuthService {
       const userResponse = user.toJSON();
       delete userResponse.password;
       
-      logger.debug('AUTH', 'User registered successfully', { userId: user.id });
+      logger.info('AUTH_SERVICE', 'User registered successfully', { userId: user.id, username: userData.username });
       return {
         success: true,
         user: userResponse
       };
     } catch (error) {
-      logger.error('AUTH', 'Error registering user', error);
+      logger.error('AUTH_SERVICE', 'Error registering user', { 
+        error: error.message,
+        stack: error.stack,
+        username: userData.username 
+      });
       return {
         success: false,
         error: error.message || 'Error registering user'
@@ -68,10 +76,12 @@ class AuthService {
    */
   async authenticateUser(username, password) {
     try {
+      logger.debug('AUTH_SERVICE', 'Starting user authentication', { username });
+
       // Find user by username
       const user = await User.findOne({ where: { username } });
       if (!user) {
-        logger.debug('AUTH', 'Authentication failed - User not found', { username });
+        logger.debug('AUTH_SERVICE', 'Authentication failed - User not found', { username });
         return { 
           success: false, 
           error: 'Invalid username or password' 
@@ -81,7 +91,7 @@ class AuthService {
       // Compare passwords
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
-        logger.debug('AUTH', 'Authentication failed - Password mismatch', { username });
+        logger.debug('AUTH_SERVICE', 'Authentication failed - Password mismatch', { username });
         return { 
           success: false, 
           error: 'Invalid username or password' 
@@ -92,13 +102,17 @@ class AuthService {
       const userResponse = user.toJSON();
       delete userResponse.password;
       
-      logger.debug('AUTH', 'Authentication successful', { userId: user.id });
+      logger.info('AUTH_SERVICE', 'Authentication successful', { userId: user.id, username });
       return { 
         success: true, 
         user: userResponse 
       };
     } catch (error) {
-      logger.error('AUTH', 'Error authenticating user', error);
+      logger.error('AUTH_SERVICE', 'Error authenticating user', { 
+        error: error.message,
+        stack: error.stack,
+        username 
+      });
       return {
         success: false,
         error: 'Authentication error occurred'
@@ -113,9 +127,11 @@ class AuthService {
    */
   async getUserById(id) {
     try {
+      logger.debug('AUTH_SERVICE', 'Getting user by ID', { userId: id });
+      
       const user = await User.findByPk(id);
       if (!user) {
-        logger.debug('AUTH', 'User not found by ID', { userId: id });
+        logger.debug('AUTH_SERVICE', 'User not found by ID', { userId: id });
         return null;
       }
 
@@ -125,7 +141,11 @@ class AuthService {
       
       return userResponse;
     } catch (error) {
-      logger.error('AUTH', 'Error getting user by ID', error);
+      logger.error('AUTH_SERVICE', 'Error getting user by ID', { 
+        error: error.message,
+        stack: error.stack,
+        userId: id 
+      });
       return null;
     }
   }
