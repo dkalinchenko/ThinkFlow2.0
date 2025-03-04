@@ -166,39 +166,43 @@ function resetState() {
 function setupFormHandlers() {
     logger.log('SETUP', 'Setting up form handlers');
     
-    // Get a reference to the name form
-    const nameForm = document.getElementById('nameForm');
-    if (nameForm) {
-        // Remove existing listeners by replacing with clone
-        const newNameForm = nameForm.cloneNode(true);
-        nameForm.parentNode.replaceChild(newNameForm, nameForm);
-        
-        // Add direct submit handler for the name form
-        newNameForm.addEventListener('submit', function(event) {
-            event.preventDefault();
+    // Direct click handler for the name form "Next" button
+    const nameNextBtn = document.getElementById('nameFormNextBtn');
+    if (nameNextBtn) {
+        nameNextBtn.addEventListener('click', function() {
+            logger.log('CLICK', 'Name form Next button clicked');
             
-            const nameInput = newNameForm.querySelector('input[name="name"]');
+            // Get name input value
+            const nameInput = document.getElementById('decisionName');
             if (!nameInput || !nameInput.value.trim()) {
-                newNameForm.classList.add('was-validated');
+                // Show validation error
+                nameInput.classList.add('is-invalid');
                 return;
             }
             
-            // Update state
+            // Remove validation error if present
+            nameInput.classList.remove('is-invalid');
+            
+            // Update state with name
+            const nameValue = nameInput.value.trim();
+            logger.log('FORM', `Processing name form with value: ${nameValue}`);
+            
+            // Reset state for a new decision but keep the name
+            resetState();
+            
+            // Update state with new name
             updateState({
-                name: nameInput.value.trim(),
+                name: nameValue,
                 step: 2
             });
             
-            // Move to next step
+            // Go to next step
             updateStep(2);
             
-            // Reset validation state
-            newNameForm.classList.remove('was-validated');
-            
-            logger.log('FORM', 'Name form submitted successfully');
+            logger.log('FORM', 'Name form processed successfully');
         });
     } else {
-        logger.error('SETUP', 'Name form not found');
+        logger.error('SETUP', 'Name form Next button not found');
     }
     
     // Handle remaining forms
@@ -1989,6 +1993,7 @@ async function calculateResults() {
         // Set up dynamic weights if they don't already exist
         setupDynamicWeights(criteria, state.decision.weights);
         
+        logger.log('RESULTS', 'Results calculated successfully');
         return results;
     } catch (error) {
         logger.error('RESULTS', 'Error calculating results:', error);
