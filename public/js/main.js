@@ -1278,10 +1278,19 @@ function displayResults(results) {
     try {
         logger.log('DISPLAY', 'Displaying results', results);
         
+        if (!results || typeof results !== 'object' || Object.keys(results).length === 0) {
+            logger.error('DISPLAY', 'Invalid results object', results);
+            showMessage('Error: No valid results to display', 'error');
+            return;
+        }
+        
         // Update decision name
         const decisionNameDisplay = document.getElementById('decision-name-display');
         if (decisionNameDisplay) {
-            decisionNameDisplay.textContent = state.decision.name;
+            decisionNameDisplay.textContent = state.decision.name || 'Unnamed Decision';
+            logger.log('DISPLAY', `Updated decision name: ${state.decision.name}`);
+        } else {
+            logger.warn('DISPLAY', 'Decision name display element not found');
         }
         
         // Sort alternatives by score
@@ -1293,21 +1302,35 @@ function displayResults(results) {
                 rank: index + 1
             }));
         
+        logger.log('DISPLAY', 'Sorted alternatives', sortedAlternatives);
+        
         // Update results table
         const resultsTable = document.getElementById('results-table');
         if (resultsTable) {
             const tbody = resultsTable.querySelector('tbody');
-            tbody.innerHTML = sortedAlternatives.map(alt => `
-                <tr>
-                    <td>${alt.name}</td>
-                    <td>${alt.score}%</td>
-                    <td>#${alt.rank}</td>
-                </tr>
-            `).join('');
+            if (tbody) {
+                tbody.innerHTML = sortedAlternatives.map(alt => `
+                    <tr>
+                        <td>${alt.name}</td>
+                        <td>${alt.score}%</td>
+                        <td>#${alt.rank}</td>
+                    </tr>
+                `).join('');
+                logger.log('DISPLAY', 'Updated results table');
+            } else {
+                logger.error('DISPLAY', 'Results table body not found');
+            }
+        } else {
+            logger.error('DISPLAY', 'Results table not found');
         }
         
         // Update chart
-        updateResultsChart(sortedAlternatives);
+        try {
+            updateResultsChart(sortedAlternatives);
+            logger.log('DISPLAY', 'Updated results chart');
+        } catch (chartError) {
+            logger.error('DISPLAY', 'Error updating chart', chartError);
+        }
         
         // Update criteria and weights list
         const criteriaList = document.getElementById('criteria-weights-list');
@@ -1318,6 +1341,9 @@ function displayResults(results) {
                     <span class="badge bg-primary rounded-pill">Weight: ${state.decision.weights[criterion]}</span>
                 </li>
             `).join('');
+            logger.log('DISPLAY', 'Updated criteria weights list');
+        } else {
+            logger.warn('DISPLAY', 'Criteria weights list element not found');
         }
         
         // Update alternatives list
@@ -1329,10 +1355,18 @@ function displayResults(results) {
                     <span class="badge bg-success rounded-pill">${alt.score}% (#${alt.rank})</span>
                 </li>
             `).join('');
+            logger.log('DISPLAY', 'Updated alternatives list');
+        } else {
+            logger.warn('DISPLAY', 'Alternatives list element not found');
         }
         
         // Set up dynamic weight adjustment
-        setupDynamicWeights();
+        try {
+            setupDynamicWeights();
+            logger.log('DISPLAY', 'Set up dynamic weights');
+        } catch (weightsError) {
+            logger.error('DISPLAY', 'Error setting up dynamic weights', weightsError);
+        }
         
     } catch (error) {
         logger.error('DISPLAY', 'Error displaying results', error);
@@ -1481,6 +1515,12 @@ function recalculateResults() {
     }
 }
 
+// Helper function to navigate to a specific step (missing in the original code)
+function goToStep(stepNumber) {
+    logger.log('NAV', `Navigating to step ${stepNumber}`);
+    updateStep(stepNumber);
+}
+
 // Calculate and display initial results
 async function calculateResults() {
     try {
@@ -1488,17 +1528,24 @@ async function calculateResults() {
         
         // Get all the evaluation data
         const evaluationData = {};
-        const evaluationRows = document.querySelectorAll('#evaluationMatrix .evaluation-row');
         
-        evaluationRows.forEach(row => {
-            const alternative = row.getAttribute('data-alternative');
-            const criterion = row.getAttribute('data-criterion');
-            const score = parseInt(row.querySelector('input').value) || 0;
+        // Collect data from each alternative and criterion
+        state.decision.alternatives.forEach(alternative => {
+            evaluationData[alternative] = {};
             
-            if (!evaluationData[alternative]) {
-                evaluationData[alternative] = {};
-            }
-            evaluationData[alternative][criterion] = score;
+            state.decision.criteria.forEach(criterion => {
+                const inputId = `eval-${alternative}-${criterion}`;
+                const input = document.getElementById(inputId);
+                
+                if (input) {
+                    const score = parseInt(input.value) || 0;
+                    evaluationData[alternative][criterion] = score;
+                    logger.log('CALC', `Collected evaluation: ${alternative}/${criterion} = ${score}`);
+                } else {
+                    logger.warn('CALC', `Input element not found for ${alternative}/${criterion}`);
+                    evaluationData[alternative][criterion] = 5; // Default value if not found
+                }
+            });
         });
         
         // Save evaluations to state
