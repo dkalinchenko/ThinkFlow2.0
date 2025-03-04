@@ -110,4 +110,9 @@ router.get('/dashboard', ensureAuthenticated, (req, res) => {
   });
 });
 
+// Guest access
+router.get('/guest', (req, res) => {
+  res.redirect('/app');
+});
+
 module.exports = router; 

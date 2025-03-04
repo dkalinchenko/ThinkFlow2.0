@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= typeof title !== 'undefined' ? title + ' - ' : '' %>Decision Matrix App</title>
+    <title><%= typeof title !== 'undefined' ? title + ' - ' : '' %>ThinkFlow</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
@@ -65,74 +65,13 @@
             min-width: 200px;
         }
     </style>
-    <!-- Enable debug mode -->
-    <script>
-        window.debugMode = true; // Always enable debug mode for now
-        
-        // Create a debug console
-        if (window.debugMode) {
-            window.addEventListener('DOMContentLoaded', () => {
-                const debugConsole = document.createElement('div');
-                debugConsole.id = 'debug-console';
-                debugConsole.style.cssText = `
-                    position: fixed;
-                    bottom: 0;
-                    right: 0;
-                    width: 400px;
-                    height: 300px;
-                    background: rgba(0, 0, 0, 0.8);
-                    color: #fff;
-                    font-family: monospace;
-                    font-size: 12px;
-                    padding: 10px;
-                    overflow-y: auto;
-                    z-index: 9999;
-                `;
-                document.body.appendChild(debugConsole);
-                
-                // Override console.log and console.error
-                const originalLog = console.log;
-                const originalError = console.error;
-                
-                console.log = function() {
-                    const args = Array.from(arguments);
-                    const message = args.map(arg => 
-                        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
-                    ).join(' ');
-                    
-                    const logEntry = document.createElement('div');
-                    logEntry.style.color = '#90EE90';
-                    logEntry.textContent = `LOG: ${message}`;
-                    debugConsole.appendChild(logEntry);
-                    debugConsole.scrollTop = debugConsole.scrollHeight;
-                    
-                    originalLog.apply(console, arguments);
-                };
-                
-                console.error = function() {
-                    const args = Array.from(arguments);
-                    const message = args.map(arg => 
-                        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
-                    ).join(' ');
-                    
-                    const logEntry = document.createElement('div');
-                    logEntry.style.color = '#FF6B6B';
-                    logEntry.textContent = `ERROR: ${message}`;
-                    debugConsole.appendChild(logEntry);
-                    debugConsole.scrollTop = debugConsole.scrollHeight;
-                    
-                    originalError.apply(console, arguments);
-                };
-            });
-        }
-    </script>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
         <div class="container">
             <a class="navbar-brand" href="/">
                 <i class="fas fa-table-list me-2"></i>
-                Decision Matrix App
+                ThinkFlow
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -210,7 +149,7 @@
         
         <!-- Footer -->
         <footer class="mt-5 pt-3 text-center text-muted border-top">
-            <p>Decision Matrix App &copy; <%= new Date().getFullYear() %></p>
+            <p>ThinkFlow &copy; <%= new Date().getFullYear() %></p>
         </footer>
     </div>
 
@@ -219,16 +158,6 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <!-- Custom JS -->
-    <script>
-        // Wait for Chart.js to load
-        window.addEventListener('load', function() {
-            if (typeof Chart === 'undefined') {
-                console.error('Chart.js failed to load');
-            } else {
-                console.log('Chart.js loaded successfully');
-            }
-        });
-    </script>
     <script src="/js/main.js"></script>
     
     <script>
@@ -249,45 +178,13 @@
             `;
             
             toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-            const toastElement = document.getElementById(toastId);
-            const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 5000 });
-            toast.show();
+            const toast = document.getElementById(toastId);
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
             
-            // Remove toast from DOM after it's hidden
-            toastElement.addEventListener('hidden.bs.toast', function() {
-                toastElement.remove();
-            });
-        };
-        
-        // Handle new decision link
-        document.getElementById('newDecisionLink').addEventListener('click', function(e) {
-            e.preventDefault();
-            if (confirm('Start a new decision? This will reset your current progress.')) {
-                localStorage.removeItem('decisionMatrixState');
-                window.location.href = '/';
-            }
-        });
-
-        // Save decision to account (for logged-in users)
-        window.saveDecisionToAccount = function(decisionId) {
-            fetch('/save-to-account', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ decisionId })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showToast(data.message, 'success');
-                } else {
-                    showToast(data.error, 'error');
-                }
-            })
-            .catch(error => {
-                showToast('An error occurred while saving the decision', 'error');
-                console.error('Error:', error);
+            // Remove toast after it's hidden
+            toast.addEventListener('hidden.bs.toast', function() {
+                toast.remove();
             });
         };
     </script>

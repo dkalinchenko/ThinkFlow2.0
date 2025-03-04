@@ -4,10 +4,14 @@ const expressLayouts = require('express-ejs-layouts');
 const session = require('express-session');
 const passport = require('passport');
 const flash = require('connect-flash');
-const { initDatabase } = require('./models');
+const { initDatabase, sequelize } = require('./models');
+const SequelizeStore = require('connect-session-sequelize')(session.Store);
 const decisionService = require('./services/decisionService');
 const logger = require('./utils/logger');
 const { checkAuthenticated } = require('./middleware/auth');
+
+// Import website routes
+const websiteRoutes = require('./routes/website');
 
 const app = express();
 const port = process.env.PORT || 3333;
@@ -44,8 +48,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// Express session
+// Session store
+const sessionStore = new SequelizeStore({
+  db: sequelize,
+  tableName: 'Sessions'
+});
+
+// Express session with enhanced security
 app.use(session({
+  store: sessionStore,
   secret: process.env.SESSION_SECRET || 'decision_matrix_secret',
   resave: false,
   saveUninitialized: false,
@@ -56,8 +67,12 @@ app.use(session({
     sameSite: 'lax'
   },
   name: 'sessionId', // Custom name for better security
-  rolling: true
+  rolling: true, // Refresh session with each request
+  proxy: process.env.NODE_ENV === 'production' // Trust the reverse proxy in production
 }));
+
+// Create session table
+sessionStore.sync();
 
 // Move passport and flash middleware AFTER session middleware
 app.use(passport.initialize());
@@ -90,6 +105,25 @@ app.use(expressLayouts);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('layout', 'layout');
+
+// Set default layout
+app.set('view options', { layout: 'layout' });
+
+// Website routes (should be before the app routes)
+app.use('/', websiteRoutes);
+
+// Redirect /app to the decision matrix tool
+app.get('/app', (req, res) => {
+    res.render('index', { 
+        layout: 'layout',
+        title: 'New Decision',
+        step: 1,
+        decisions: {},
+        currentId: null,
+        isAuthenticated: req.isAuthenticated(),
+        user: req.user
+    });
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {

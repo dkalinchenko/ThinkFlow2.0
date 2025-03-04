@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+    <!-- Main circle -->
+    <circle cx="60" cy="60" r="50" fill="none" stroke="white" stroke-width="4"/>
+    
+    <!-- Decision flow lines -->
+    <path d="M60 30 L60 90" stroke="white" stroke-width="4"/>
+    <path d="M40 45 L80 45" stroke="white" stroke-width="4"/>
+    <path d="M40 75 L80 75" stroke="white" stroke-width="4"/>
+    
+    <!-- Decision points -->
+    <circle cx="60" cy="45" r="6" fill="white"/>
+    <circle cx="60" cy="75" r="6" fill="white"/>
+    
+    <!-- Flow arrows -->
+    <path d="M75 45 L70 40 L75 35" stroke="white" stroke-width="4" fill="none"/>
+    <path d="M45 75 L50 70 L45 65" stroke="white" stroke-width="4" fill="none"/>
+</svg> 

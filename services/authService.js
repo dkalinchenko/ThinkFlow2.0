@@ -46,13 +46,11 @@ class AuthService {
       const userResponse = user.toJSON();
       delete userResponse.password;
       
-      logger.debug('AUTH', 'User registered successfully', { userId: user.id });
       return {
         success: true,
         user: userResponse
       };
     } catch (error) {
-      logger.error('AUTH', 'Error registering user', error);
       return {
         success: false,
         error: error.message || 'Error registering user'
@@ -71,7 +69,6 @@ class AuthService {
       // Find user by username
       const user = await User.findOne({ where: { username } });
       if (!user) {
-        logger.debug('AUTH', 'Authentication failed - User not found', { username });
         return { 
           success: false, 
           error: 'Invalid username or password' 
@@ -81,7 +78,6 @@ class AuthService {
       // Compare passwords
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
-        logger.debug('AUTH', 'Authentication failed - Password mismatch', { username });
         return { 
           success: false, 
           error: 'Invalid username or password' 
@@ -92,13 +88,11 @@ class AuthService {
       const userResponse = user.toJSON();
       delete userResponse.password;
       
-      logger.debug('AUTH', 'Authentication successful', { userId: user.id });
       return { 
         success: true, 
         user: userResponse 
       };
     } catch (error) {
-      logger.error('AUTH', 'Error authenticating user', error);
       return {
         success: false,
         error: 'Authentication error occurred'
@@ -115,7 +109,6 @@ class AuthService {
     try {
       const user = await User.findByPk(id);
       if (!user) {
-        logger.debug('AUTH', 'User not found by ID', { userId: id });
         return null;
       }
 
@@ -125,7 +118,6 @@ class AuthService {
       
       return userResponse;
     } catch (error) {
-      logger.error('AUTH', 'Error getting user by ID', error);
       return null;
     }
   }
@@ -140,7 +132,6 @@ class AuthService {
     try {
       const user = await User.findByPk(id);
       if (!user) {
-        logger.debug('AUTH', 'User not found for update', { userId: id });
         return {
           success: false,
           error: 'User not found'
@@ -163,13 +154,11 @@ class AuthService {
       const userResponse = user.toJSON();
       delete userResponse.password;
       
-      logger.debug('AUTH', 'User updated successfully', { userId: id });
       return {
         success: true,
         user: userResponse
       };
     } catch (error) {
-      logger.error('AUTH', 'Error updating user', error);
       return {
         success: false,
         error: error.message || 'Error updating user'
