@@ -168,13 +168,27 @@ function setupFormHandlers() {
     
     // Direct click handler for the name form "Next" button
     const nameNextBtn = document.getElementById('nameFormNextBtn');
+    console.log("Name Next Button:", nameNextBtn); // Direct console log for debugging
+    
     if (nameNextBtn) {
-        nameNextBtn.addEventListener('click', function() {
-            logger.log('CLICK', 'Name form Next button clicked');
+        // Remove any existing event listeners by replacing with clone
+        const newNameNextBtn = nameNextBtn.cloneNode(true);
+        nameNextBtn.parentNode.replaceChild(newNameNextBtn, nameNextBtn);
+        
+        newNameNextBtn.addEventListener('click', function(event) {
+            console.log("Name Next Button Clicked!"); // Direct console log for debugging
             
             // Get name input value
             const nameInput = document.getElementById('decisionName');
-            if (!nameInput || !nameInput.value.trim()) {
+            if (!nameInput) {
+                console.error("Decision name input element not found");
+                return;
+            }
+            
+            const nameValue = nameInput.value.trim();
+            console.log("Name input value:", nameValue); // Direct console log for debugging
+            
+            if (!nameValue) {
                 // Show validation error
                 nameInput.classList.add('is-invalid');
                 return;
@@ -183,26 +197,52 @@ function setupFormHandlers() {
             // Remove validation error if present
             nameInput.classList.remove('is-invalid');
             
-            // Update state with name
-            const nameValue = nameInput.value.trim();
-            logger.log('FORM', `Processing name form with value: ${nameValue}`);
-            
-            // Reset state for a new decision but keep the name
-            resetState();
-            
-            // Update state with new name
-            updateState({
-                name: nameValue,
-                step: 2
-            });
-            
-            // Go to next step
-            updateStep(2);
-            
-            logger.log('FORM', 'Name form processed successfully');
+            // First update state with the name
+            try {
+                // Deep clone the current state to create a fresh state
+                const freshState = {
+                    currentStep: 2,
+                    decision: {
+                        name: nameValue,
+                        criteria: [],
+                        weights: {},
+                        alternatives: [],
+                        evaluations: {},
+                        results: {}
+                    }
+                };
+                
+                // Replace the current state
+                Object.assign(state, freshState);
+                
+                // Save to storage immediately
+                saveStateToStorage();
+                console.log("State updated with name:", nameValue);
+                
+                // Go to next step explicitly
+                console.log("Navigating to step 2");
+                
+                // Update UI directly first
+                document.querySelectorAll('.step-container').forEach((container, index) => {
+                    if (index + 1 === 2) {
+                        container.classList.add('active');
+                    } else {
+                        container.classList.remove('active');
+                    }
+                });
+                
+                // Then call updateStep
+                updateStep(2);
+                
+                console.log("Navigation complete");
+            } catch (error) {
+                console.error("Error in name form handling:", error);
+            }
         });
+        
+        console.log("Event listener attached to nameNextBtn");
     } else {
-        logger.error('SETUP', 'Name form Next button not found');
+        console.error("nameFormNextBtn element not found");
     }
     
     // Handle remaining forms
