@@ -46,15 +46,14 @@
                     <h3 class="card-title">Name Your Decision</h3>
                     <p class="card-text">What decision are you trying to make?</p>
                     <form id="nameForm" class="needs-validation" novalidate>
-                        <input type="hidden" name="id" value="<%= Date.now() %>">
+                        <input type="hidden" name="id" id="decisionId" value="<%= Date.now() %>" autocomplete="off">
                         <div class="mb-3">
-                            <label for="decisionName" class="form-label">Decision Name</label>
-                            <input type="text" class="form-control" id="decisionName" name="name" placeholder="e.g., Choosing a New Car" required>
+                            <input type="text" class="form-control" id="decisionName" name="decisionName" placeholder="Enter decision name" required autocomplete="off">
                             <div class="invalid-feedback">
                                 Please enter a name for your decision.
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">Next</button>
+                        <button type="button" id="nameFormNextBtn" class="btn btn-primary w-100">Next</button>
                     </form>
                 </div>
             </div>
@@ -175,15 +174,8 @@
 
         <!-- Results -->
         <div class="step-container <%= step === 6 ? 'active' : '' %>" id="step6">
-            <div class="row mb-4">
-                <div class="col-md-12 text-center">
-                    <h2>Decision Results</h2>
-                    <p class="text-muted">Below are the results of your decision matrix analysis.</p>
-                </div>
-            </div>
-
-            <div class="row justify-content-center mb-4">
-                <div class="col-lg-8">
+            <div class="row justify-content-center mb-4" style="max-width: 800px; margin: 0 auto;">
+                <div class="col-md-12">
                     <div class="card">
                         <div class="card-header bg-primary text-white">
                             <h3 class="card-title mb-0">Decision: <span id="resultDecisionName"></span></h3>
@@ -260,19 +252,21 @@
             
             <div class="row mb-4">
                 <div class="col-md-12 text-center">
-                    <% if (typeof isAuthenticated !== 'undefined' && isAuthenticated) { %>
-                        <button id="save-to-account-btn" class="btn btn-success btn-lg">
-                            <i class="fas fa-save me-2"></i> Save To My Account
+                    <div class="d-inline-flex gap-2 justify-content-center">
+                        <% if (typeof isAuthenticated !== 'undefined' && isAuthenticated) { %>
+                            <button id="save-to-account-btn" class="btn btn-success btn-lg">
+                                <i class="fas fa-save me-2"></i> Save To My Account
+                            </button>
+                        <% } else { %>
+                            <div class="alert alert-info mb-0 d-inline-block">
+                                <i class="fas fa-info-circle me-2"></i> <a href="/login">Log in</a> or <a href="/register">register</a> to save this decision to your account.
+                            </div>
+                        <% } %>
+                        
+                        <button id="newDecisionBtn" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus me-2"></i> Start New Decision
                         </button>
-                    <% } else { %>
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i> <a href="/login">Log in</a> or <a href="/register">register</a> to save this decision to your account.
-                        </div>
-                    <% } %>
-                    
-                    <button id="newDecisionBtn" class="btn btn-primary btn-lg ms-2">
-                        <i class="fas fa-plus me-2"></i> Start New Decision
-                    </button>
+                    </div>
                 </div>
             </div>
         </div>

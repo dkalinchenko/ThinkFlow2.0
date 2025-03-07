@@ -24,7 +24,7 @@ const ensureGuest = (req, res, next) => {
 // Check if user is authenticated (for conditional rendering)
 const checkAuthenticated = (req, res, next) => {
   // List of public routes that don't require authentication
-  const publicRoutes = ['/', '/login', '/register', '/blog', '/faq', '/blog/*', '/app', '/save-step'];
+  const publicRoutes = ['/', '/login', '/register', '/blog', '/faq', '/blog/*', '/app', '/save-step', '/health', '/contact'];
 
   // Check if the current route matches any of the public routes
   const isPublicRoute = publicRoutes.some(route => {

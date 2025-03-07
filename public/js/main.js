@@ -14,7 +14,8 @@ let state = {
         alternatives: [],
         evaluations: {},
         results: {}
-    }
+    },
+    originalWeights: {}
 };
 
 // DOM Elements
@@ -89,63 +90,33 @@ function initializeApp() {
 
 // Load state from localStorage
 function loadStateFromStorage() {
-    try {
-        logger.log('STORAGE', 'Loading state from localStorage');
-        
-        // Try to get state from localStorage
-        const savedState = localStorage.getItem('decisionState');
-        
-        if (savedState) {
-            // Parse the state
-            const parsedState = JSON.parse(savedState);
-            
-            // Validate state structure
-            if (parsedState && parsedState.decision) {
-                state = parsedState;
-                logger.log('STORAGE', 'State loaded successfully from localStorage');
-            } else {
-                logger.warn('STORAGE', 'Invalid state structure in localStorage, initializing fresh state');
-                state = resetState();
-            }
-        } else {
-            logger.log('STORAGE', 'No saved state found in localStorage, initializing fresh state');
-            state = resetState();
-        }
-    } catch (error) {
-        logger.error('STORAGE', 'Error loading state from localStorage:', error);
-        state = resetState();
-    }
-    
-    // Ensure we always have a valid state
-    if (!state || !state.decision) {
-        logger.warn('STORAGE', 'Invalid state after loading, resetting to default');
-        state = resetState();
-    }
-    
-    logger.log('STORAGE', 'Current state:', state);
+    // Don't try to use localStorage at all
+    logger.log('STORAGE', 'Storage access not available, using memory state');
+    return null;
 }
 
 // Save state to localStorage
 function saveStateToStorage() {
-    try {
-        logger.log('STORAGE', 'Saving state to localStorage');
-        
-        // Save state to localStorage
-        localStorage.setItem('decisionState', JSON.stringify(state));
-        
-        logger.log('STORAGE', 'State saved successfully to localStorage');
-    } catch (error) {
-        logger.error('STORAGE', 'Error saving state to localStorage:', error);
-    }
+    // Don't try to use localStorage at all
+    logger.log('STORAGE', 'Storage access not available, using memory state');
+    return;
 }
 
 // Reset application state
 function resetState() {
     logger.log('STATE', 'Resetting state');
     
+    // First, destroy any existing chart instance
+    if (window.resultsChartInstance) {
+        logger.log('CHART', 'Destroying existing chart instance');
+        window.resultsChartInstance.destroy();
+        window.resultsChartInstance = null;
+    }
+    
     // Clear state
     state = {
         currentStep: 1,
+        decisionId: null,
         decision: {
             name: '',
             criteria: [],
@@ -153,14 +124,78 @@ function resetState() {
             alternatives: [],
             evaluations: {},
             results: {}
-        }
+        },
+        originalWeights: {}
     };
     
-    // Save to storage
-    saveStateToStorage();
+    // Clear any existing form data
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.reset();
+        form.classList.remove('was-validated');
+    });
+    
+    // Clear any dynamic content
+    const criteriaList = document.getElementById('criteriaList');
+    if (criteriaList) criteriaList.innerHTML = '';
+    
+    const alternativesList = document.getElementById('alternativesList');
+    if (alternativesList) alternativesList.innerHTML = '';
+    
+    const evaluationMatrix = document.getElementById('evaluationMatrix');
+    if (evaluationMatrix) evaluationMatrix.innerHTML = '';
+    
+    const weightSliders = document.getElementById('weightSliders');
+    if (weightSliders) weightSliders.innerHTML = '';
+    
+    // Clear results display
+    const resultsTable = document.querySelector('#resultsTable tbody');
+    if (resultsTable) resultsTable.innerHTML = '';
+    
+    const resultsSummary = document.getElementById('resultsSummary');
+    if (resultsSummary) resultsSummary.innerHTML = '';
+    
+    // Clear local storage
+    try {
+        localStorage.removeItem('decisionState');
+    } catch (error) {
+        // Ignore storage errors
+    }
+    
+    // Hide all steps except first
+    document.querySelectorAll('.step-container').forEach((container, index) => {
+        if (index === 0) {
+            container.classList.add('active');
+            container.style.display = 'block';
+        } else {
+            container.classList.remove('active');
+            container.style.display = 'none';
+        }
+    });
+    
+    // Reset step indicators
+    document.querySelectorAll('.step-indicator .step').forEach((indicator, index) => {
+        if (index === 0) {
+            indicator.classList.add('active');
+        } else {
+            indicator.classList.remove('active');
+        }
+    });
+    
+    // Clear chart container
+    const chartContainer = document.getElementById('resultsChartContainer');
+    if (chartContainer) {
+        chartContainer.innerHTML = '<canvas id="resultsChart"></canvas>';
+    }
+    
+    // Focus on decision name input
+    const decisionNameInput = document.getElementById('decisionName');
+    if (decisionNameInput) {
+        decisionNameInput.value = '';
+        decisionNameInput.focus();
+    }
     
     logger.log('STATE', 'State reset complete');
-    
     return state;
 }
 
@@ -170,7 +205,7 @@ function setupFormHandlers() {
     
     // Direct click handler for the name form "Next" button
     const nameNextBtn = document.getElementById('nameFormNextBtn');
-    console.log("Name Next Button:", nameNextBtn); // Direct console log for debugging
+    console.log("Name Next Button:", nameNextBtn);
     
     if (nameNextBtn) {
         // Remove any existing event listeners by replacing with clone
@@ -178,7 +213,8 @@ function setupFormHandlers() {
         nameNextBtn.parentNode.replaceChild(newNameNextBtn, nameNextBtn);
         
         newNameNextBtn.addEventListener('click', function(event) {
-            console.log("Name Next Button Clicked!"); // Direct console log for debugging
+            event.preventDefault(); // Prevent form submission
+            console.log("Name Next Button Clicked!");
             
             // Get name input value
             const nameInput = document.getElementById('decisionName');
@@ -188,7 +224,7 @@ function setupFormHandlers() {
             }
             
             const nameValue = nameInput.value.trim();
-            console.log("Name input value:", nameValue); // Direct console log for debugging
+            console.log("Name input value:", nameValue);
             
             if (!nameValue) {
                 // Show validation error
@@ -199,47 +235,31 @@ function setupFormHandlers() {
             // Remove validation error if present
             nameInput.classList.remove('is-invalid');
             
-            // First update state with the name
-            try {
-                // Deep clone the current state to create a fresh state
-                const freshState = {
-                    currentStep: 2,
-                    decision: {
-                        name: nameValue,
-                        criteria: [],
-                        weights: {},
-                        alternatives: [],
-                        evaluations: {},
-                        results: {}
-                    }
-                };
-                
-                // Replace the current state
-                Object.assign(state, freshState);
-                
-                // Save to storage immediately
-                saveStateToStorage();
-                console.log("State updated with name:", nameValue);
-                
-                // Go to next step explicitly
-                console.log("Navigating to step 2");
-                
-                // Update UI directly first
-                document.querySelectorAll('.step-container').forEach((container, index) => {
-                    if (index + 1 === 2) {
-                        container.classList.add('active');
-                    } else {
-                        container.classList.remove('active');
-                    }
-                });
-                
-                // Then call updateStep
-                updateStep(2);
-                
-                console.log("Navigation complete");
-            } catch (error) {
-                console.error("Error in name form handling:", error);
-            }
+            // Update state with the name
+            state.decision.name = nameValue;
+            state.currentStep = 2;
+            
+            // Update UI directly without relying on storage
+            document.querySelectorAll('.step-container').forEach((container, index) => {
+                if (index + 1 === 2) {
+                    container.classList.add('active');
+                    container.style.display = 'block';
+                } else {
+                    container.classList.remove('active');
+                    container.style.display = 'none';
+                }
+            });
+            
+            // Update step indicators
+            document.querySelectorAll('.step-indicator .step').forEach((indicator, index) => {
+                if (index + 1 <= 2) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            });
+            
+            console.log("Navigation complete");
         });
         
         console.log("Event listener attached to nameNextBtn");
@@ -249,21 +269,27 @@ function setupFormHandlers() {
     
     // Handle remaining forms
     const formIds = ['criteriaForm', 'weightsForm', 'alternativesForm'];
-    
     formIds.forEach((formId, index) => {
         const form = document.getElementById(formId);
         if (form) {
-            // Remove any existing event listeners by cloning the form
             const newForm = form.cloneNode(true);
             form.parentNode.replaceChild(newForm, form);
             
-            // Add the event listener
             newForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
-                await handleFormSubmit(newForm, index + 2); // +2 because we start at step 2
+                console.log(`Form ${formId} submitted`);
+                await handleFormSubmit(newForm, index + 2);
             });
-        } else {
-            logger.error('SETUP', `Form with id ${formId} not found`);
+
+            // Add direct handlers for the submit buttons
+            const submitBtn = newForm.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.addEventListener('click', async (event) => {
+                    event.preventDefault();
+                    console.log(`${formId} submit button clicked`);
+                    await handleFormSubmit(newForm, index + 2);
+                });
+            }
         }
     });
     
@@ -292,7 +318,9 @@ function setupDynamicControls() {
     
     // Setup add criteria button
     if (addCriteriaBtn) {
-        addCriteriaBtn.addEventListener('click', function(event) {
+        const newAddCriteriaBtn = addCriteriaBtn.cloneNode(true);
+        addCriteriaBtn.parentNode.replaceChild(newAddCriteriaBtn, addCriteriaBtn);
+        newAddCriteriaBtn.addEventListener('click', function(event) {
             logger.log('CLICK', 'Add criteria button clicked');
             addCriteriaField(event);
         });
@@ -300,7 +328,9 @@ function setupDynamicControls() {
     
     // Setup add alternative button
     if (addAlternativeBtn) {
-        addAlternativeBtn.addEventListener('click', function(event) {
+        const newAddAlternativeBtn = addAlternativeBtn.cloneNode(true);
+        addAlternativeBtn.parentNode.replaceChild(newAddAlternativeBtn, addAlternativeBtn);
+        newAddAlternativeBtn.addEventListener('click', function(event) {
             logger.log('CLICK', 'Add alternative button clicked');
             addAlternativeField(event);
         });
@@ -308,37 +338,15 @@ function setupDynamicControls() {
     
     // Setup new decision button
     if (newDecisionBtn) {
-        newDecisionBtn.addEventListener('click', function() {
+        const newNewDecisionBtn = newDecisionBtn.cloneNode(true);
+        newDecisionBtn.parentNode.replaceChild(newNewDecisionBtn, newDecisionBtn);
+        newNewDecisionBtn.addEventListener('click', function() {
             logger.log('CLICK', 'New decision button clicked');
             if (confirm('Are you sure you want to start a new decision? All current data will be lost.')) {
                 logger.log('NAVIGATION', 'Starting new decision');
                 
-                // Destroy any existing chart instance
-                if (window.resultsChartInstance) {
-                    logger.log('CHART', 'Destroying chart for new decision');
-                    window.resultsChartInstance.destroy();
-                    window.resultsChartInstance = null;
-                }
-                
-                // Reset the state completely
-                resetState();
-                
-                // Ensure we're going to step 1
-                logger.log('NAVIGATION', 'Navigating to step 1');
-                
-                // Need to explicitly update the UI first
-                document.querySelectorAll('.step-container').forEach((container, index) => {
-                    if (index + 1 === 1) {
-                        container.classList.add('active');
-                    } else {
-                        container.classList.remove('active');
-                    }
-                });
-                
-                // Then update state
-                updateStep(1);
-                
-                logger.log('NAVIGATION', 'New decision started');
+                // Redirect to the app page to start a new decision
+                window.location.href = '/app';
             }
         });
     }
@@ -353,7 +361,13 @@ function setupDescriptionToggles() {
     
     const toggleButtons = document.querySelectorAll('.toggle-description');
     toggleButtons.forEach(button => {
-        button.addEventListener('click', function() {
+        // Remove existing listeners by cloning and replacing
+        const newButton = button.cloneNode(true);
+        button.parentNode.replaceChild(newButton, button);
+        
+        newButton.addEventListener('click', function(event) {
+            event.preventDefault();
+            console.log('Description toggle clicked');
             const collapse = this.parentElement.previousElementSibling;
             if (collapse) {
                 const isHidden = !collapse.classList.contains('show');
@@ -426,14 +440,36 @@ async function handleFormSubmit(form, step) {
                     }
                 });
                 
-                updateState({
-                    criteria: criteria,
-                    criteriaDescriptions: descriptions,
-                    step: 3
-                });
+                // Update state
+                state.decision.criteria = criteria;
+                state.decision.criteriaDescriptions = descriptions;
+                state.currentStep = 3;
                 
                 // Prepare weight fields for step 3
                 prepareWeightFields(criteria);
+                
+                // Navigate to step 3 directly
+                document.querySelectorAll('.step-container').forEach((container, index) => {
+                    if (index + 1 === 3) {
+                        container.classList.add('active');
+                        container.style.display = 'block';
+                    } else {
+                        container.classList.remove('active');
+                        container.style.display = 'none';
+                    }
+                });
+                
+                // Update step indicators
+                document.querySelectorAll('.step-indicator .step').forEach((indicator, index) => {
+                    if (index + 1 <= 3) {
+                        indicator.classList.add('active');
+                    } else {
+                        indicator.classList.remove('active');
+                    }
+                });
+                
+                console.log("Navigation to step 3 complete");
+                return true;
                 break;
                 
             case 'weightsForm':
@@ -449,10 +485,32 @@ async function handleFormSubmit(form, step) {
                     weights[criterion] = weights[criterion] / totalWeight;
                 });
                 
-                updateState({
-                    weights: weights,
-                    step: 4
+                // Update state directly
+                state.decision.weights = weights;
+                state.currentStep = 4;
+                
+                // Navigate to step 4 directly
+                document.querySelectorAll('.step-container').forEach((container, index) => {
+                    if (index + 1 === 4) {
+                        container.classList.add('active');
+                        container.style.display = 'block';
+                    } else {
+                        container.classList.remove('active');
+                        container.style.display = 'none';
+                    }
                 });
+                
+                // Update step indicators
+                document.querySelectorAll('.step-indicator .step').forEach((indicator, index) => {
+                    if (index + 1 <= 4) {
+                        indicator.classList.add('active');
+                    } else {
+                        indicator.classList.remove('active');
+                    }
+                });
+                
+                console.log("Navigation to step 4 complete");
+                return true;
                 break;
                 
             case 'alternativesForm':
@@ -473,14 +531,36 @@ async function handleFormSubmit(form, step) {
                     }
                 });
                 
-                updateState({
-                    alternatives: alternatives,
-                    alternativeDescriptions: altDescriptions,
-                    step: 5
-                });
+                // Update state directly
+                state.decision.alternatives = alternatives;
+                state.decision.alternativeDescriptions = altDescriptions;
+                state.currentStep = 5;
                 
                 // Prepare evaluation matrix for step 5
                 prepareEvaluationMatrix(alternatives, state.decision.criteria);
+                
+                // Navigate to step 5 directly
+                document.querySelectorAll('.step-container').forEach((container, index) => {
+                    if (index + 1 === 5) {
+                        container.classList.add('active');
+                        container.style.display = 'block';
+                    } else {
+                        container.classList.remove('active');
+                        container.style.display = 'none';
+                    }
+                });
+                
+                // Update step indicators
+                document.querySelectorAll('.step-indicator .step').forEach((indicator, index) => {
+                    if (index + 1 <= 5) {
+                        indicator.classList.add('active');
+                    } else {
+                        indicator.classList.remove('active');
+                    }
+                });
+                
+                console.log("Navigation to step 5 complete");
+                return true;
                 break;
                 
             case 'evaluationForm':
@@ -910,19 +990,27 @@ async function showResults(results, currentState) {
         // Format the results for display - ensure scores are between 0 and 100
         // First find the highest score to normalize others against
         let maxScore = 0;
-        Object.values(results).forEach(score => {
+        Object.values(results).forEach(result => {
+            // Check if result is an object with a score property (new format)
+            const score = typeof result === 'object' && result.score !== undefined ? result.score : result;
             if (score > maxScore) maxScore = score;
         });
         
         // Now normalize and format
-        const formattedResults = Object.entries(results).map(([alternative, score]) => {
-            // If max score is 0, avoid division by zero
-            const normalizedScore = maxScore > 0 ? (score / maxScore) * 100 : 0;
+        const formattedResults = Object.entries(results).map(([alternative, result]) => {
+            // Check if result is an object with a score property (new format)
+            const score = typeof result === 'object' && result.score !== undefined ? result.score : result;
+            const rank = typeof result === 'object' && result.rank !== undefined ? result.rank : 0;
+            
+            // Ensure score is a number and format it
+            const numericScore = parseFloat(score) || 0;
+            
             return {
                 alternative,
-                score: parseFloat(normalizedScore.toFixed(1))
+                score: numericScore.toFixed(2),
+                rank: rank || 0
             };
-        }).sort((a, b) => b.score - a.score);
+        }).sort((a, b) => parseFloat(b.score) - parseFloat(a.score));
         
         logger.log('RESULTS_DISPLAY', 'Formatted results', formattedResults);
 
@@ -946,7 +1034,7 @@ async function showResults(results, currentState) {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${result.alternative}</td>
-                <td>${result.score}%</td>
+                <td>${result.score}</td>
                 <td>#${index + 1}</td>
             `;
             resultsTableBody.appendChild(row);
@@ -963,7 +1051,7 @@ async function showResults(results, currentState) {
                 li.className = 'list-group-item d-flex justify-content-between align-items-center';
                 li.innerHTML = `
                     ${criterion}
-                    <span class="badge bg-primary rounded-pill">Weight: ${weight}</span>
+                    <span class="badge bg-primary rounded-pill">Weight: ${weight.toFixed(2)}</span>
                 `;
                 criteriaWeightsList.appendChild(li);
             });
@@ -1095,9 +1183,9 @@ function createResultsChart(formattedResults) {
             
             // Prepare data for chart
             const labels = formattedResults.map(result => result.alternative);
-            const data = formattedResults.map(result => result.score);
+            const scores = formattedResults.map(result => result.score);
             
-            logger.log('CHART', 'Chart data prepared', { labels, data });
+            logger.log('CHART', 'Chart data prepared', { labels, scores });
             
             // Define colors with opacity
             const backgroundColors = [
@@ -1117,7 +1205,7 @@ function createResultsChart(formattedResults) {
                     labels: labels,
                     datasets: [{
                         label: 'Score (%)',
-                        data: data,
+                        data: scores,
                         backgroundColor: backgroundColors.slice(0, labels.length),
                         borderColor: backgroundColors.slice(0, labels.length).map(color => color.replace('0.7', '1')),
                         borderWidth: 1
@@ -1133,8 +1221,16 @@ function createResultsChart(formattedResults) {
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return `Score: ${context.parsed.y}%`;
+                                    const rank = context.dataIndex + 1;
+                                    return `Score: ${context.raw} (Rank: ${rank})`;
                                 }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Decision Results',
+                            font: {
+                                size: 16
                             }
                         }
                     },
@@ -1143,14 +1239,13 @@ function createResultsChart(formattedResults) {
                             beginAtZero: true,
                             title: {
                                 display: true,
-                                text: 'Score (%)'
-                            },
-                            max: 100
+                                text: 'Score'
+                            }
                         },
                         x: {
                             title: {
                                 display: true,
-                                text: 'Alternative'
+                                text: 'Alternatives'
                             }
                         }
                     }
@@ -1266,7 +1361,7 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 input.setAttribute('data-alternative', alternative);
                 input.setAttribute('data-criterion', criterion);
                 
-                // Store the initial value in state
+                // Set initial value in state
                 state.decision.evaluations[alternative][criterion] = parseInt(initialValue);
                 
                 // Update value display when slider moves
@@ -1281,6 +1376,7 @@ function prepareEvaluationMatrix(alternatives, criteria) {
                 input.addEventListener('input', updateValue);
                 input.addEventListener('change', updateValue);
                 
+                // Add the input to the slider container
                 sliderContainer.appendChild(input);
                 
                 field.appendChild(labelContainer);
@@ -1335,14 +1431,34 @@ function calculateButtonHandler(event) {
         
         logger.log('EVALUATION', 'Collected evaluations:', evaluations);
         
-        // Update state and calculate results
-        updateState({
-            step: 6,
-            evaluations: evaluations
+        // Update state directly
+        state.decision.evaluations = evaluations;
+        state.currentStep = 6;
+        
+        // Navigate to step 6 directly
+        document.querySelectorAll('.step-container').forEach((container, index) => {
+            if (index + 1 === 6) {
+                container.classList.add('active');
+                container.style.display = 'block';
+            } else {
+                container.classList.remove('active');
+                container.style.display = 'none';
+            }
+        });
+        
+        // Update step indicators
+        document.querySelectorAll('.step-indicator .step').forEach((indicator, index) => {
+            if (index + 1 <= 6) {
+                indicator.classList.add('active');
+            } else {
+                indicator.classList.remove('active');
+            }
         });
         
         // Calculate and display results
-        calculateResults();
+        recalculateResults();
+        
+        console.log("Navigation to step 6 (results) complete");
     } catch (error) {
         logger.error('EVALUATION', 'Error handling evaluation calculation:', error);
         showError('An error occurred while calculating results. Please try again.');
@@ -1540,7 +1656,6 @@ function updateResultsChart(results) {
         if (window.resultsChartInstance) {
             logger.log('CHART', 'Destroying existing chart instance');
             window.resultsChartInstance.destroy();
-            window.resultsChartInstance = null;
         }
         
         // Get chart container
@@ -1550,100 +1665,97 @@ function updateResultsChart(results) {
             return;
         }
         
-        // Get or create the canvas element
-        let chartCanvas = document.getElementById('resultsChart');
+        // Completely remove any existing canvas
+        chartContainer.innerHTML = '';
         
-        // If canvas doesn't exist, create it
-        if (!chartCanvas) {
-            logger.log('CHART', 'Creating new chart canvas');
-            chartCanvas = document.createElement('canvas');
-            chartCanvas.id = 'resultsChart';
-            // Clear the container before adding the new canvas
-            chartContainer.innerHTML = '';
-            chartContainer.appendChild(chartCanvas);
-        } else {
-            // If canvas exists, clear the container and recreate it
-            logger.log('CHART', 'Replacing existing chart canvas');
-            chartContainer.innerHTML = '';
-            chartCanvas = document.createElement('canvas');
-            chartCanvas.id = 'resultsChart';
-            chartContainer.appendChild(chartCanvas);
-        }
+        // Create a new canvas element with a unique ID
+        const chartCanvas = document.createElement('canvas');
+        chartCanvas.id = 'resultsChart_' + Date.now();
+        chartContainer.appendChild(chartCanvas);
         
-        // Sort alternatives by score
-        const sortedAlternatives = Object.keys(results).sort((a, b) => {
-            // Make sure we're comparing actual numbers
-            const scoreA = typeof results[a].score === 'number' ? results[a].score : 0;
-            const scoreB = typeof results[b].score === 'number' ? results[b].score : 0;
-            return scoreB - scoreA;
-        });
+        // Get the alternatives and scores from results
+        const sortedResults = Object.entries(results)
+            .map(([alt, result]) => {
+                const score = typeof result === 'object' && result.score !== undefined 
+                    ? parseFloat(result.score) 
+                    : parseFloat(result);
+                return { alt, score };
+            })
+            .sort((a, b) => b.score - a.score);
         
-        // Prepare data for chart
-        const labels = sortedAlternatives;
-        const scores = sortedAlternatives.map(alt => (results[alt].score * 100).toFixed(1));
-        const backgroundColors = sortedAlternatives.map((_, index) => {
+        const labels = sortedResults.map(item => item.alt);
+        const scores = sortedResults.map(item => item.score);
+        
+        const backgroundColors = sortedResults.map((_, index) => {
             if (index === 0) return 'rgba(40, 167, 69, 0.7)'; // First (best) is green
-            if (index === sortedAlternatives.length - 1) return 'rgba(220, 53, 69, 0.7)'; // Last is red
+            if (index === sortedResults.length - 1) return 'rgba(220, 53, 69, 0.7)'; // Last is red
             return 'rgba(0, 123, 255, 0.7)'; // Others are blue
         });
         
         // Create chart
         const ctx = chartCanvas.getContext('2d');
-        window.resultsChartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Score (%)',
-                    data: scores,
-                    backgroundColor: backgroundColors,
-                    borderColor: backgroundColors.map(color => color.replace('0.7', '1')),
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
+        
+        // Add a small delay to ensure the DOM has updated
+        setTimeout(() => {
+            try {
+                window.resultsChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Score',
+                            data: scores,
+                            backgroundColor: backgroundColors,
+                            borderColor: backgroundColors.map(color => color.replace('0.7', '1')),
+                            borderWidth: 1
+                        }]
                     },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const rank = results[context.label].rank;
-                                return `Score: ${context.raw}% (Rank: ${rank})`;
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const rank = context.dataIndex + 1;
+                                        return `Score: ${context.raw} (Rank: ${rank})`;
+                                    }
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Decision Results',
+                                font: {
+                                    size: 16
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Score'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Alternatives'
+                                }
                             }
                         }
-                    },
-                    title: {
-                        display: true,
-                        text: 'Decision Results',
-                        font: {
-                            size: 16
-                        }
                     }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        title: {
-                            display: true,
-                            text: 'Score (%)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Alternatives'
-                        }
-                    }
-                }
+                });
+                
+                logger.log('CHART', 'Chart created successfully');
+            } catch (chartError) {
+                logger.error('CHART', 'Error creating chart in timeout:', chartError);
             }
-        });
-        
-        logger.log('CHART', 'Chart created successfully');
+        }, 50);
     } catch (error) {
         logger.error('CHART', 'Error creating results chart:', error);
     }
@@ -1664,36 +1776,28 @@ function setupDynamicWeights(criteria, initialWeights) {
         // Clear existing sliders
         weightSlidersContainer.innerHTML = '';
         
-        // Ensure we have weights
-        if (!initialWeights || Object.keys(initialWeights).length === 0) {
-            logger.log('WEIGHTS', 'No initial weights provided, using equal weights');
-            initialWeights = {};
+        // Store the original weights for reset functionality
+        if (!state.originalWeights || Object.keys(state.originalWeights).length === 0) {
+            state.originalWeights = {};
             criteria.forEach(criterion => {
-                initialWeights[criterion] = 1 / criteria.length;
+                // Convert decimal weights to 1-10 scale or set default
+                const origWeight = initialWeights[criterion];
+                state.originalWeights[criterion] = origWeight >= 0 && origWeight <= 1 ? 
+                    Math.round(origWeight * 10) : (origWeight || 5);
             });
+            logger.log('WEIGHTS', 'Original weights stored:', state.originalWeights);
         }
-        
-        // Track if we need to normalize the weights (if they don't sum to 1)
-        let totalWeight = 0;
-        criteria.forEach(criterion => {
-            totalWeight += parseFloat(initialWeights[criterion] || 0);
-        });
-        
-        if (totalWeight === 0) {
-            logger.error('WEIGHTS', 'Total weight is zero, cannot normalize');
-            return;
-        }
-        
-        // Create a normalized weights object
-        const normalizedWeights = {};
-        criteria.forEach(criterion => {
-            normalizedWeights[criterion] = parseFloat(initialWeights[criterion] || 0) / totalWeight;
-        });
         
         // Create a slider for each criterion
         criteria.forEach(criterion => {
-            const weight = normalizedWeights[criterion] || (1 / criteria.length);
-            const weightPercentage = Math.round(weight * 100);
+            // Convert decimal weights to 1-10 scale or use raw value if already on that scale
+            let weight = initialWeights[criterion];
+            // If weight is a decimal between 0-1, scale it to 1-10
+            if (weight >= 0 && weight <= 1) {
+                weight = Math.round(weight * 10);
+            }
+            // Ensure weight is within 1-10 range
+            weight = Math.max(1, Math.min(10, weight || 5));
             
             const sliderContainer = document.createElement('div');
             sliderContainer.className = 'mb-3';
@@ -1708,7 +1812,7 @@ function setupDynamicWeights(criteria, initialWeights) {
             const valueDisplay = document.createElement('span');
             valueDisplay.className = 'badge bg-primary';
             valueDisplay.id = `weight-${criterion}-value`;
-            valueDisplay.textContent = `${weightPercentage}%`;
+            valueDisplay.textContent = weight;
             
             labelContainer.appendChild(label);
             labelContainer.appendChild(valueDisplay);
@@ -1717,63 +1821,97 @@ function setupDynamicWeights(criteria, initialWeights) {
             input.type = 'range';
             input.className = 'form-range weight-slider';
             input.id = `weight-${criterion}`;
-            input.min = '0';
-            input.max = '100';
+            input.min = '1';
+            input.max = '10';
             input.step = '1';
-            input.value = weightPercentage;
+            input.value = weight;
             input.setAttribute('data-criterion', criterion);
             
-            // Throttle function to avoid too many recalculations
-            let timeout = null;
-            const throttledUpdate = function() {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => {
-                    const newWeight = parseInt(this.value) / 100;
-                    valueDisplay.textContent = `${this.value}%`;
-                    
-                    // Update weight in state
-                    state.decision.weights[criterion] = newWeight;
-                    
-                    // Recalculate results with updated weights
-                    recalculateResults();
-                    
-                    logger.log('WEIGHTS', `Updated weight for ${criterion}: ${newWeight}`);
-                }, 100);
+            // Simple function to update weight value without normalization
+            const updateWeight = function() {
+                const newWeight = parseInt(this.value);
+                valueDisplay.textContent = newWeight;
+                
+                // Update weight in state directly
+                state.decision.weights[criterion] = newWeight;
+                
+                // Recalculate results with updated weights
+                recalculateResults();
+                
+                logger.log('WEIGHTS', `Updated weight for ${criterion}: ${newWeight}`);
             };
             
-            input.addEventListener('input', throttledUpdate);
+            input.addEventListener('input', updateWeight);
+            input.addEventListener('change', updateWeight);
             
             sliderContainer.appendChild(labelContainer);
             sliderContainer.appendChild(input);
             
             weightSlidersContainer.appendChild(sliderContainer);
-            logger.log('WEIGHTS', `Created weight slider for ${criterion}: ${weightPercentage}%`);
+            logger.log('WEIGHTS', `Created weight slider for ${criterion}: ${weight}`);
         });
         
+        // Add button container
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'd-flex gap-2 mt-3';
+        
         // Add a "Reset to Equal Weights" button
-        const resetButton = document.createElement('button');
-        resetButton.className = 'btn btn-outline-secondary mt-3';
-        resetButton.textContent = 'Reset to Equal Weights';
-        resetButton.onclick = function() {
-            const equalWeight = 1 / criteria.length;
-            const equalWeightPercentage = Math.round(equalWeight * 100);
+        const resetEqualButton = document.createElement('button');
+        resetEqualButton.className = 'btn btn-outline-secondary';
+        resetEqualButton.textContent = 'Reset to Equal Weights';
+        resetEqualButton.onclick = function() {
+            criteria.forEach(criterion => {
+                state.decision.weights[criterion] = 5; // Middle value
+            });
             
+            // Update sliders to show the new values
             criteria.forEach(criterion => {
                 const slider = document.getElementById(`weight-${criterion}`);
                 const valueDisplay = document.getElementById(`weight-${criterion}-value`);
                 
                 if (slider && valueDisplay) {
-                    slider.value = equalWeightPercentage;
-                    valueDisplay.textContent = `${equalWeightPercentage}%`;
-                    state.decision.weights[criterion] = equalWeight;
+                    slider.value = 5;
+                    valueDisplay.textContent = 5;
                 }
             });
             
             recalculateResults();
-            logger.log('WEIGHTS', 'Reset to equal weights');
+            logger.log('WEIGHTS', 'Reset to equal weights (all set to 5)');
         };
         
-        weightSlidersContainer.appendChild(resetButton);
+        // Add a "Reset to Original Weights" button
+        const resetOriginalButton = document.createElement('button');
+        resetOriginalButton.className = 'btn btn-outline-primary';
+        resetOriginalButton.textContent = 'Reset to Original Weights';
+        resetOriginalButton.onclick = function() {
+            if (state.originalWeights && Object.keys(state.originalWeights).length > 0) {
+                criteria.forEach(criterion => {
+                    state.decision.weights[criterion] = state.originalWeights[criterion] || 5;
+                });
+                
+                // Update sliders to show the original values
+                criteria.forEach(criterion => {
+                    const slider = document.getElementById(`weight-${criterion}`);
+                    const valueDisplay = document.getElementById(`weight-${criterion}-value`);
+                    
+                    if (slider && valueDisplay) {
+                        slider.value = state.originalWeights[criterion] || 5;
+                        valueDisplay.textContent = state.originalWeights[criterion] || 5;
+                    }
+                });
+                
+                recalculateResults();
+                logger.log('WEIGHTS', 'Reset to original weights');
+            } else {
+                logger.error('WEIGHTS', 'Original weights not found');
+                showError('Original weights not found');
+            }
+        };
+        
+        buttonContainer.appendChild(resetEqualButton);
+        buttonContainer.appendChild(resetOriginalButton);
+        weightSlidersContainer.appendChild(buttonContainer);
+        
         logger.log('WEIGHTS', 'Dynamic weights setup completed');
     } catch (error) {
         logger.error('WEIGHTS', 'Error setting up dynamic weights:', error);
@@ -1783,123 +1921,88 @@ function setupDynamicWeights(criteria, initialWeights) {
 
 // Recalculate results with updated weights
 function recalculateResults() {
-    logger.log('RESULTS', 'Recalculating results with updated weights');
+    logger.log('RESULTS', 'Recalculating results with new weights');
     
     try {
-        // Get evaluation data from state
-        const evaluations = state.decision.evaluations;
+        // Gather data needed for calculation
         const criteria = state.decision.criteria;
         const alternatives = state.decision.alternatives;
         const weights = state.decision.weights;
+        const evaluations = state.decision.evaluations;
         
-        if (!evaluations || !criteria || !alternatives || !weights) {
-            logger.error('RESULTS', 'Missing required data for recalculation');
-            return;
-        }
-        
-        // Normalize weights to ensure they sum to 1
-        let totalWeight = 0;
-        criteria.forEach(criterion => {
-            totalWeight += parseFloat(weights[criterion] || 0);
+        logger.log('RESULTS', 'Data for recalculation', {
+            criteriaCount: criteria.length,
+            alternativesCount: alternatives.length,
+            weights,
+            evaluations
         });
         
-        if (totalWeight === 0) {
-            logger.error('RESULTS', 'Total weight is zero, cannot normalize');
-            return;
+        // Validate data
+        if (!criteria || !alternatives || !weights || !evaluations ||
+            criteria.length === 0 || alternatives.length === 0 ||
+            Object.keys(weights).length === 0 || Object.keys(evaluations).length === 0) {
+            logger.error('RESULTS', 'Missing data for recalculation');
+            showError('Missing data for recalculation.');
+            return null;
         }
         
-        // Create a normalized weights object
-        const normalizedWeights = {};
-        criteria.forEach(criterion => {
-            normalizedWeights[criterion] = parseFloat(weights[criterion] || 0) / totalWeight;
-        });
-        
-        // Calculate weighted scores for each alternative
+        // Recalculate scores
         const results = {};
+        
+        // Calculate the maximum possible score
+        const maxPossibleScore = criteria.reduce((total, criterion) => {
+            return total + (10 * weights[criterion]); // 10 is max evaluation score
+        }, 0);
+        
+        // For each alternative
         alternatives.forEach(alternative => {
-            let totalScore = 0;
-            let possibleScore = 0;
+            if (!evaluations[alternative]) {
+                logger.error('RESULTS', `Missing evaluations for alternative: ${alternative}`);
+                results[alternative] = 0;
+                return;
+            }
             
+            let totalScore = 0;
+            
+            // For each criterion
             criteria.forEach(criterion => {
-                if (!evaluations[alternative] || evaluations[alternative][criterion] === undefined) {
-                    logger.warn('RESULTS', `Missing evaluation for ${alternative}/${criterion}`);
-                    return;
-                }
+                const weight = weights[criterion] || 5; // Default to middle weight if missing
+                const evaluation = evaluations[alternative][criterion] || 0;
                 
-                const score = evaluations[alternative][criterion];
-                const weight = normalizedWeights[criterion];
+                // Weighted score for this criterion
+                const weightedScore = (weight / 10) * evaluation; // Normalize weight to 0-1 scale
+                totalScore += weightedScore;
                 
-                totalScore += score * weight;
-                possibleScore += 10 * weight; // 10 is the max score
+                logger.log('RESULTS', `${alternative}/${criterion}: ${evaluation} * ${weight/10} = ${weightedScore}`);
             });
             
-            // Calculate percentage score
-            results[alternative] = {
-                score: totalScore,
-                percentage: (totalScore / possibleScore) * 100,
-                rank: 0 // Will be set after sorting
+            // Store final score
+            results[alternative] = totalScore;
+            logger.log('RESULTS', `Total score for ${alternative}: ${totalScore}`);
+        });
+        
+        // Rank alternatives
+        const sortedAlternatives = Object.entries(results)
+            .sort(([, scoreA], [, scoreB]) => {
+                return scoreB - scoreA;
+            })
+            .map(([alt], index) => ({ alt, rank: index + 1 }));
+            
+        // Add rank to results
+        sortedAlternatives.forEach(({ alt, rank }) => {
+            results[alt] = {
+                score: results[alt],
+                rank: rank
             };
-            
-            logger.log('RESULTS', `Calculated score for ${alternative}: ${totalScore} (${results[alternative].percentage.toFixed(2)}%)`);
         });
         
-        // Sort alternatives by score and assign ranks
-        const sortedAlternatives = Object.keys(results).sort((a, b) => results[b].score - results[a].score);
-        sortedAlternatives.forEach((alternative, index) => {
-            results[alternative].rank = index + 1;
-        });
-        
-        // Save results to state
+        // Update state
         state.decision.results = results;
-        saveStateToStorage();
         
-        // Update the results display without changing the step
-        updateResultsChart(results);
+        // Update UI
+        displayResults(results);
         
-        // Update results table
-        const resultsTable = document.getElementById('resultsTable');
-        if (resultsTable) {
-            const resultsTableBody = resultsTable.querySelector('tbody');
-            if (resultsTableBody) {
-                resultsTableBody.innerHTML = '';
-                
-                sortedAlternatives.forEach((alternative) => {
-                    const row = document.createElement('tr');
-                    
-                    const alternativeCell = document.createElement('td');
-                    alternativeCell.textContent = alternative;
-                    
-                    const scoreCell = document.createElement('td');
-                    const percentage = results[alternative].percentage.toFixed(1);
-                    scoreCell.textContent = `${percentage}%`;
-                    
-                    const rankCell = document.createElement('td');
-                    rankCell.textContent = results[alternative].rank;
-                    
-                    row.appendChild(alternativeCell);
-                    row.appendChild(scoreCell);
-                    row.appendChild(rankCell);
-                    
-                    resultsTableBody.appendChild(row);
-                });
-            }
-        }
-        
-        // Update results summary
-        const resultsSummary = document.getElementById('resultsSummary');
-        if (resultsSummary) {
-            const bestAlternative = sortedAlternatives[0];
-            const bestScore = results[bestAlternative].percentage.toFixed(1);
-            
-            resultsSummary.innerHTML = `
-                <div class="alert alert-success">
-                    <h4>Decision Analysis Complete</h4>
-                    <p>Based on your criteria and evaluations, <strong>${bestAlternative}</strong> is the best option with a score of <strong>${bestScore}%</strong>.</p>
-                </div>
-            `;
-        }
-        
-        logger.log('RESULTS', 'Results recalculated successfully with updated weights');
+        logger.log('RESULTS', 'Results recalculated successfully', results);
         return results;
     } catch (error) {
         logger.error('RESULTS', 'Error recalculating results:', error);
@@ -1980,9 +2083,20 @@ async function calculateResults() {
         });
         
         // Sort alternatives by score and assign ranks
-        const sortedAlternatives = Object.keys(results).sort((a, b) => results[b].score - results[a].score);
-        sortedAlternatives.forEach((alternative, index) => {
-            results[alternative].rank = index + 1;
+        const sortedAlternatives = Object.entries(results)
+            .sort(([, scoreA], [, scoreB]) => {
+                const a = typeof scoreA === 'object' ? scoreA.score : scoreA;
+                const b = typeof scoreB === 'object' ? scoreB.score : scoreB;
+                return parseFloat(b) - parseFloat(a);
+            })
+            .map(([alt], index) => ({ alt, rank: index + 1 }));
+            
+        // Add rank to results
+        sortedAlternatives.forEach(({ alt, rank }) => {
+            results[alt] = {
+                score: results[alt],
+                rank: rank
+            };
         });
         
         logger.log('RESULTS', 'Final calculated results:', results);
