@@ -1,0 +1,62 @@
+services:
+  # Backend API service
+  - type: web
+    name: thinkflow-api
+    env: node
+    region: oregon  # Change to your preferred region
+    buildCommand: cd server && npm install
+    startCommand: cd server && node src/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRATION
+        value: 24h
+      - key: CLIENT_URL
+        fromService:
+          name: thinkflow-frontend
+          type: web
+          property: url
+      - key: DB_HOST
+        fromDatabase:
+          name: thinkflow-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: thinkflow-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: thinkflow-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: thinkflow-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: thinkflow-db
+          property: password
+
+  # Frontend static site
+  - type: web
+    name: thinkflow-frontend
+    env: static
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: ./client/build
+    envVars:
+      - key: REACT_APP_API_URL
+        fromService:
+          name: thinkflow-api
+          type: web
+          property: url
+
+databases:
+  - name: thinkflow-db
+    plan: free  # Change to a paid plan for production use
+    databaseName: thinkflow
+    user: thinkflow_user 

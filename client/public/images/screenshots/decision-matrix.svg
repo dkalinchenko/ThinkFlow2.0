@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="500" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="headerGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3F51B5" />
+      <stop offset="100%" stop-color="#8E24AA" />
+    </linearGradient>
+  </defs>
+  
+  <!-- App window frame -->
+  <rect x="0" y="0" width="800" height="500" rx="6" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  
+  <!-- Header -->
+  <rect x="0" y="0" width="800" height="60" rx="6" fill="url(#headerGradient)" />
+  <text x="20" y="37" font-family="Arial" font-size="18" fill="white" font-weight="bold">ThinkFlow Decision Matrix</text>
+  
+  <!-- Decision title -->
+  <text x="40" y="90" font-family="Arial" font-size="20" fill="#333333" font-weight="bold">Programming Language Selection</text>
+  
+  <!-- Matrix header -->
+  <rect x="40" y="120" width="150" height="40" fill="#F5F5F5" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="190" y="120" width="120" height="40" fill="#F5F5F5" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="310" y="120" width="120" height="40" fill="#F5F5F5" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="430" y="120" width="120" height="40" fill="#F5F5F5" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="550" y="120" width="150" height="40" fill="#F5F5F5" stroke="#E0E0E0" stroke-width="1" />
+  
+  <text x="115" y="145" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333" font-weight="bold">Languages</text>
+  <text x="250" y="145" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333" font-weight="bold">Job Market (30%)</text>
+  <text x="370" y="145" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333" font-weight="bold">Future Growth (40%)</text>
+  <text x="490" y="145" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333" font-weight="bold">Learning Curve (30%)</text>
+  <text x="625" y="145" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333" font-weight="bold">Total Score</text>
+  
+  <!-- Matrix rows -->
+  <!-- Python -->
+  <rect x="40" y="160" width="150" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="190" y="160" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="310" y="160" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="430" y="160" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="550" y="160" width="150" height="50" fill="#F0F8FF" stroke="#E0E0E0" stroke-width="1" />
+  
+  <text x="50" y="190" font-family="Arial" font-size="14" fill="#333333">Python</text>
+  <text x="250" y="190" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★★★</text>
+  <text x="370" y="190" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★★☆</text>
+  <text x="490" y="190" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★★★</text>
+  <text x="625" y="190" font-family="Arial" font-size="18" text-anchor="middle" fill="#3F51B5" font-weight="bold">9.2</text>
+  
+  <!-- JavaScript -->
+  <rect x="40" y="210" width="150" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="190" y="210" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="310" y="210" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="430" y="210" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="550" y="210" width="150" height="50" fill="#F0F8FF" stroke="#E0E0E0" stroke-width="1" />
+  
+  <text x="50" y="240" font-family="Arial" font-size="14" fill="#333333">JavaScript</text>
+  <text x="250" y="240" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★★★</text>
+  <text x="370" y="240" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★★★</text>
+  <text x="490" y="240" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★☆☆</text>
+  <text x="625" y="240" font-family="Arial" font-size="18" text-anchor="middle" fill="#3F51B5" font-weight="bold">9.0</text>
+  
+  <!-- Rust -->
+  <rect x="40" y="260" width="150" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="190" y="260" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="310" y="260" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="430" y="260" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="550" y="260" width="150" height="50" fill="#F0F8FF" stroke="#E0E0E0" stroke-width="1" />
+  
+  <text x="50" y="290" font-family="Arial" font-size="14" fill="#333333">Rust</text>
+  <text x="250" y="290" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★☆☆</text>
+  <text x="370" y="290" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★★★</text>
+  <text x="490" y="290" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★☆☆☆</text>
+  <text x="625" y="290" font-family="Arial" font-size="18" text-anchor="middle" fill="#3F51B5" font-weight="bold">7.4</text>
+  
+  <!-- Go -->
+  <rect x="40" y="310" width="150" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="190" y="310" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="310" y="310" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="430" y="310" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="550" y="310" width="150" height="50" fill="#F0F8FF" stroke="#E0E0E0" stroke-width="1" />
+  
+  <text x="50" y="340" font-family="Arial" font-size="14" fill="#333333">Go</text>
+  <text x="250" y="340" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★★☆</text>
+  <text x="370" y="340" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★★☆</text>
+  <text x="490" y="340" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★★☆</text>
+  <text x="625" y="340" font-family="Arial" font-size="18" text-anchor="middle" fill="#3F51B5" font-weight="bold">8.6</text>
+  
+  <!-- Ruby -->
+  <rect x="40" y="360" width="150" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="190" y="360" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="310" y="360" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="430" y="360" width="120" height="50" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  <rect x="550" y="360" width="150" height="50" fill="#F0F8FF" stroke="#E0E0E0" stroke-width="1" />
+  
+  <text x="50" y="390" font-family="Arial" font-size="14" fill="#333333">Ruby</text>
+  <text x="250" y="390" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★☆☆</text>
+  <text x="370" y="390" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★☆☆</text>
+  <text x="490" y="390" font-family="Arial" font-size="14" text-anchor="middle" fill="#333333">★★★★☆</text>
+  <text x="625" y="390" font-family="Arial" font-size="18" text-anchor="middle" fill="#3F51B5" font-weight="bold">7.2</text>
+  
+  <!-- Action buttons -->
+  <rect x="40" y="430" width="120" height="40" rx="4" fill="#3F51B5" />
+  <text x="100" y="455" font-family="Arial" font-size="14" text-anchor="middle" fill="white">Edit Matrix</text>
+  
+  <rect x="170" y="430" width="120" height="40" rx="4" fill="#8E24AA" />
+  <text x="230" y="455" font-family="Arial" font-size="14" text-anchor="middle" fill="white">Visualize</text>
+  
+  <rect x="300" y="430" width="120" height="40" rx="4" fill="#FFFFFF" stroke="#3F51B5" stroke-width="1" />
+  <text x="360" y="455" font-family="Arial" font-size="14" text-anchor="middle" fill="#3F51B5">Share</text>
+</svg> 
