@@ -5,7 +5,7 @@ services:
     env: node
     region: oregon  # Change to your preferred region
     buildCommand: cd server && npm install
-    startCommand: cd server && npm run start:simplified
+    startCommand: node /opt/render/project/src/server/src/simplified-index.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
