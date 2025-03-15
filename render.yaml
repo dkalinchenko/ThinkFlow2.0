@@ -17,10 +17,7 @@ services:
       - key: JWT_EXPIRATION
         value: 24h
       - key: CLIENT_URL
-        fromService:
-          name: thinkflow-frontend
-          type: web
-          property: url
+        value: https://thinkflow-frontend.onrender.com
       - key: DB_HOST
         fromDatabase:
           name: thinkflow-db
@@ -50,10 +47,7 @@ services:
     staticPublishPath: ./client/build
     envVars:
       - key: REACT_APP_API_URL
-        fromService:
-          name: thinkflow-api
-          type: web
-          property: url
+        value: https://thinkflow-api.onrender.com
 
 databases:
   - name: thinkflow-db
