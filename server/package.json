@@ -5,7 +5,9 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
+    "start:simplified": "node src/simplified-index.js",
     "dev": "nodemon src/index.js",
+    "dev:simplified": "nodemon src/simplified-index.js",
     "test": "jest"
   },
   "dependencies": {
