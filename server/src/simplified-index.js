@@ -46,6 +46,26 @@ const decisions = [];
 const createSampleDecisions = (userId, userName, userEmail) => {
   const sampleDecisions = [
     {
+      id: '2d7b9c64-8215-4427-94da-426f7b492a62', // Fixed ID for the public demo decision
+      title: "Choosing a Programming Language for New Project",
+      description: "We need to select the best programming language for our new web application, considering various technical and team factors.",
+      criteria: [
+        { id: 'c1', name: "Performance", weight: 1.8 },
+        { id: 'c2', name: "Developer Availability", weight: 2.0 },
+        { id: 'c3', name: "Ecosystem & Libraries", weight: 1.7 },
+        { id: 'c4', name: "Learning Curve", weight: 1.2 },
+        { id: 'c5', name: "Long-term Support", weight: 1.5 }
+      ],
+      alternatives: [
+        { id: 'a1', name: "JavaScript/Node.js", description: "Popular for full-stack development with extensive ecosystem" },
+        { id: 'a2', name: "Python", description: "Excellent for data processing with simple syntax" },
+        { id: 'a3', name: "Go", description: "High performance with great concurrency support" },
+        { id: 'a4', name: "Rust", description: "Memory safety without garbage collection, steep learning curve" },
+        { id: 'a5', name: "TypeScript", description: "JavaScript with static typing for better maintainability" }
+      ],
+      isPublic: true
+    },
+    {
       title: "Choosing a New Laptop",
       description: "I need to purchase a new laptop for work and personal use. I want to find the best balance of performance, portability, and value.",
       criteria: [
@@ -96,26 +116,6 @@ const createSampleDecisions = (userId, userName, userEmail) => {
         { name: "Candidate D", description: "Experienced developer looking to change industries" }
       ]
     },
-    // New sample decision 1: Choosing Programming Language
-    {
-      title: "Choosing a Programming Language for New Project",
-      description: "We need to select the best programming language for our new web application, considering various technical and team factors.",
-      criteria: [
-        { name: "Performance", weight: 1.8 },
-        { name: "Developer Availability", weight: 2.0 },
-        { name: "Ecosystem & Libraries", weight: 1.7 },
-        { name: "Learning Curve", weight: 1.2 },
-        { name: "Long-term Support", weight: 1.5 }
-      ],
-      alternatives: [
-        { name: "JavaScript/Node.js", description: "Popular for full-stack development with extensive ecosystem" },
-        { name: "Python", description: "Excellent for data processing with simple syntax" },
-        { name: "Go", description: "High performance with great concurrency support" },
-        { name: "Rust", description: "Memory safety without garbage collection, steep learning curve" },
-        { name: "TypeScript", description: "JavaScript with static typing for better maintainability" }
-      ],
-      isPublic: true
-    },
     // New sample decision 2: Office Location
     {
       title: "Selecting New Office Location",
@@ -162,11 +162,11 @@ const createSampleDecisions = (userId, userName, userEmail) => {
   const createdDecisions = [];
   
   sampleDecisions.forEach(sample => {
-    const criteriaIds = sample.criteria.map(() => uuidv4());
-    const alternativeIds = sample.alternatives.map(() => uuidv4());
+    const criteriaIds = sample.criteria.map(c => c.id || uuidv4());
+    const alternativeIds = sample.alternatives.map(a => a.id || uuidv4());
     
     const newDecision = {
-      id: uuidv4(),
+      id: sample.id || uuidv4(),
       title: sample.title,
       description: sample.description,
       created_by: userId,
@@ -177,7 +177,7 @@ const createSampleDecisions = (userId, userName, userEmail) => {
       },
       status: 'active',
       isPublic: Boolean(sample.isPublic),
-      is_sample: true, // Flag to identify sample decisions
+      is_sample: true,
       created_at: now,
       updated_at: now,
       criteria: sample.criteria.map((criterion, index) => ({
