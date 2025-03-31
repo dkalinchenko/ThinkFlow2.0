@@ -17,7 +17,8 @@ import {
 import { CheckCircle as CheckCircleIcon, Error as ErrorIcon } from '@mui/icons-material';
 import { getCurrentUser } from '../../features/auth/authSlice';
 
-const API_URL = 'http://localhost:5001/api';
+// Use environment variable or default to localhost
+const API_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5001') + '/api';
 
 const AcceptInvitation = () => {
   const { token } = useParams();
