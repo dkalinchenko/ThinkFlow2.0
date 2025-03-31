@@ -60,8 +60,9 @@ const PublicDecisionView = () => {
         setLoading(true);
         console.log('Fetching public decision with ID:', id);
         
-        // Use the full URL to ensure proper connection
-        const apiUrl = `http://localhost:5001/api/public/decisions/${id}`;
+        // Use the API URL from environment variable or fallback to localhost
+        const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+        const apiUrl = `${baseUrl}/api/public/decisions/${id}`;
         console.log('Making API request to:', apiUrl);
         
         const response = await axios.get(apiUrl, {
