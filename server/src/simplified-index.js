@@ -1054,7 +1054,7 @@ app.get('/api/decisions/:id/check-permissions', authMiddleware, (req, res) => {
 resetDemoAccount();
 
 // Start server with proper error handling
-const PORT = 5001; // Use a different port
+const PORT = process.env.PORT || 5001; // Use environment variable with fallback to 5001
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 })
