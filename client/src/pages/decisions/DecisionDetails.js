@@ -323,8 +323,9 @@ const DecisionDetails = () => {
   const checkPermissions = async () => {
     try {
       const token = localStorage.getItem('token');
+      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
       const response = await axios.get(
-        `http://localhost:5001/api/decisions/${id}/check-permissions`,
+        `${baseUrl}/api/decisions/${id}/check-permissions`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

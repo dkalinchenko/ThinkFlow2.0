@@ -30,8 +30,9 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5001/api';
-const CLIENT_URL = 'http://localhost:3000';
+// Use environment variables for API and client URLs
+const API_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5001') + '/api';
+const CLIENT_URL = process.env.REACT_APP_CLIENT_URL || window.location.origin;
 
 const InviteCollaboratorModal = ({ open, onClose, decisionId, decisionTitle, invitations = [], onInvitationSent }) => {
   const [email, setEmail] = useState('');
