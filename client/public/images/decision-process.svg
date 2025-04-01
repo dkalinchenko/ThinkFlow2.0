@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="500" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5C6BC0" />
+      <stop offset="100%" stop-color="#3F51B5" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background Elements -->
+  <rect x="0" y="0" width="800" height="500" fill="#FFFFFF" />
+  
+  <!-- Step 1: Define Alternatives -->
+  <g transform="translate(50, 50)">
+    <rect x="0" y="0" width="150" height="150" rx="10" fill="#F5F5F5" stroke="#3F51B5" stroke-width="2" />
+    <text x="75" y="30" font-family="Arial" font-size="16" text-anchor="middle" fill="#3F51B5" font-weight="bold">Step 1</text>
+    <text x="75" y="55" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">Define</text>
+    <text x="75" y="75" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">Alternatives</text>
+    
+    <!-- Icons representing alternatives -->
+    <rect x="30" y="95" width="30" height="30" rx="4" fill="url(#blueGradient)" opacity="0.7" />
+    <rect x="70" y="95" width="30" height="30" rx="4" fill="url(#blueGradient)" opacity="0.8" />
+    <rect x="110" y="95" width="30" height="30" rx="4" fill="url(#blueGradient)" opacity="0.9" />
+  </g>
+  
+  <!-- Step 2: Set Criteria -->
+  <g transform="translate(250, 50)">
+    <rect x="0" y="0" width="150" height="150" rx="10" fill="#F5F5F5" stroke="#3F51B5" stroke-width="2" />
+    <text x="75" y="30" font-family="Arial" font-size="16" text-anchor="middle" fill="#3F51B5" font-weight="bold">Step 2</text>
+    <text x="75" y="55" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">Set</text>
+    <text x="75" y="75" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">Criteria</text>
+    
+    <!-- Icons representing criteria with weights -->
+    <line x1="30" y1="100" x2="120" y2="100" stroke="#3F51B5" stroke-width="2" />
+    <line x1="30" y1="120" x2="90" y2="120" stroke="#3F51B5" stroke-width="4" />
+    <line x1="30" y1="140" x2="110" y2="140" stroke="#3F51B5" stroke-width="3" />
+  </g>
+  
+  <!-- Step 3: Collaborate & Score -->
+  <g transform="translate(450, 50)">
+    <rect x="0" y="0" width="150" height="150" rx="10" fill="#F5F5F5" stroke="#3F51B5" stroke-width="2" />
+    <text x="75" y="30" font-family="Arial" font-size="16" text-anchor="middle" fill="#3F51B5" font-weight="bold">Step 3</text>
+    <text x="75" y="55" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">Collaborate</text>
+    <text x="75" y="75" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">& Score</text>
+    
+    <!-- Icons representing people -->
+    <circle cx="50" cy="110" r="15" fill="url(#blueGradient)" />
+    <circle cx="75" cy="110" r="15" fill="url(#blueGradient)" opacity="0.8" />
+    <circle cx="100" cy="110" r="15" fill="url(#blueGradient)" opacity="0.6" />
+    
+    <!-- Stars representing ratings -->
+    <path d="M50,140 L53,146 L60,147 L55,152 L56,159 L50,156 L44,159 L45,152 L40,147 L47,146 Z" fill="gold" />
+    <path d="M75,140 L78,146 L85,147 L80,152 L81,159 L75,156 L69,159 L70,152 L65,147 L72,146 Z" fill="gold" />
+    <path d="M100,140 L103,146 L110,147 L105,152 L106,159 L100,156 L94,159 L95,152 L90,147 L97,146 Z" fill="gold" />
+  </g>
+  
+  <!-- Step 4: Analyze & Decide -->
+  <g transform="translate(650, 50)">
+    <rect x="0" y="0" width="150" height="150" rx="10" fill="#F5F5F5" stroke="#3F51B5" stroke-width="2" />
+    <text x="75" y="30" font-family="Arial" font-size="16" text-anchor="middle" fill="#3F51B5" font-weight="bold">Step 4</text>
+    <text x="75" y="55" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">Analyze</text>
+    <text x="75" y="75" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">& Decide</text>
+    
+    <!-- Bar chart icon -->
+    <rect x="30" y="95" width="20" height="50" fill="url(#blueGradient)" opacity="0.6" />
+    <rect x="60" y="95" width="20" height="35" fill="url(#blueGradient)" opacity="0.8" />
+    <rect x="90" y="95" width="20" height="20" fill="url(#blueGradient)" opacity="0.9" />
+    <line x1="30" y1="145" x2="110" y2="145" stroke="#333" stroke-width="2" />
+  </g>
+  
+  <!-- Process Flow Arrows -->
+  <g>
+    <path d="M200,125 L250,125" stroke="#3F51B5" stroke-width="2" fill="none" />
+    <polygon points="245,120 250,125 245,130" fill="#3F51B5" />
+    
+    <path d="M400,125 L450,125" stroke="#3F51B5" stroke-width="2" fill="none" />
+    <polygon points="445,120 450,125 445,130" fill="#3F51B5" />
+    
+    <path d="M600,125 L650,125" stroke="#3F51B5" stroke-width="2" fill="none" />
+    <polygon points="645,120 650,125 645,130" fill="#3F51B5" />
+  </g>
+  
+  <!-- Decision Matrix Example -->
+  <g transform="translate(150, 250)">
+    <rect x="0" y="0" width="500" height="200" rx="10" fill="#F5F5F5" stroke="#3F51B5" stroke-width="2" />
+    <text x="250" y="30" font-family="Arial" font-size="18" text-anchor="middle" fill="#3F51B5" font-weight="bold">Decision Matrix</text>
+    
+    <!-- Table Header -->
+    <rect x="50" y="50" width="100" height="30" fill="#3F51B5" />
+    <rect x="150" y="50" width="100" height="30" fill="#3F51B5" />
+    <rect x="250" y="50" width="100" height="30" fill="#3F51B5" />
+    <rect x="350" y="50" width="100" height="30" fill="#3F51B5" />
+    
+    <text x="100" y="70" font-family="Arial" font-size="14" text-anchor="middle" fill="white">Alternatives</text>
+    <text x="200" y="70" font-family="Arial" font-size="14" text-anchor="middle" fill="white">Criterion 1</text>
+    <text x="300" y="70" font-family="Arial" font-size="14" text-anchor="middle" fill="white">Criterion 2</text>
+    <text x="400" y="70" font-family="Arial" font-size="14" text-anchor="middle" fill="white">Total Score</text>
+    
+    <!-- Table Rows -->
+    <rect x="50" y="80" width="100" height="30" fill="white" stroke="#DDD" />
+    <rect x="150" y="80" width="100" height="30" fill="white" stroke="#DDD" />
+    <rect x="250" y="80" width="100" height="30" fill="white" stroke="#DDD" />
+    <rect x="350" y="80" width="100" height="30" fill="white" stroke="#DDD" />
+    
+    <rect x="50" y="110" width="100" height="30" fill="white" stroke="#DDD" />
+    <rect x="150" y="110" width="100" height="30" fill="white" stroke="#DDD" />
+    <rect x="250" y="110" width="100" height="30" fill="white" stroke="#DDD" />
+    <rect x="350" y="110" width="100" height="30" fill="white" stroke="#DDD" />
+    
+    <rect x="50" y="140" width="100" height="30" fill="white" stroke="#DDD" />
+    <rect x="150" y="140" width="100" height="30" fill="white" stroke="#DDD" />
+    <rect x="250" y="140" width="100" height="30" fill="white" stroke="#DDD" />
+    <rect x="350" y="140" width="100" height="30" fill="white" stroke="#DDD" />
+    
+    <!-- Table Data -->
+    <text x="100" y="100" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">Option A</text>
+    <text x="200" y="100" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">★★★★☆</text>
+    <text x="300" y="100" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">★★★☆☆</text>
+    <text x="400" y="100" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">7.5 / 10</text>
+    
+    <text x="100" y="130" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">Option B</text>
+    <text x="200" y="130" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">★★★☆☆</text>
+    <text x="300" y="130" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">★★★★★</text>
+    <text x="400" y="130" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">8.2 / 10</text>
+    
+    <text x="100" y="160" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">Option C</text>
+    <text x="200" y="160" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">★★☆☆☆</text>
+    <text x="300" y="160" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">★★★☆☆</text>
+    <text x="400" y="160" font-family="Arial" font-size="14" text-anchor="middle" fill="#333">5.0 / 10</text>
+  </g>
+</svg> 

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="500" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="headerGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3F51B5" />
+      <stop offset="100%" stop-color="#8E24AA" />
+    </linearGradient>
+    <linearGradient id="barGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3F51B5" />
+      <stop offset="100%" stop-color="#5C6BC0" />
+    </linearGradient>
+    <linearGradient id="barGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7E57C2" />
+      <stop offset="100%" stop-color="#9575CD" />
+    </linearGradient>
+    <linearGradient id="barGradient3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#5C6BC0" />
+      <stop offset="100%" stop-color="#7986CB" />
+    </linearGradient>
+  </defs>
+  
+  <!-- App window frame -->
+  <rect x="0" y="0" width="800" height="500" rx="6" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" />
+  
+  <!-- Header -->
+  <rect x="0" y="0" width="800" height="60" rx="6" fill="url(#headerGradient)" />
+  <text x="20" y="37" font-family="Arial" font-size="18" fill="white" font-weight="bold">ThinkFlow Decision Visualization</text>
+  
+  <!-- Decision title -->
+  <text x="40" y="90" font-family="Arial" font-size="20" fill="#333333" font-weight="bold">Which Programming Language to Learn Next?</text>
+  
+  <!-- Chart area -->
+  <rect x="40" y="110" width="720" height="320" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1" rx="4" />
+  
+  <!-- Chart axes -->
+  <line x1="100" y1="380" x2="700" y2="380" stroke="#333333" stroke-width="1" />
+  <line x1="100" y1="380" x2="100" y2="150" stroke="#333333" stroke-width="1" />
+  
+  <!-- Y-axis labels -->
+  <text x="90" y="380" font-family="Arial" font-size="12" text-anchor="end" fill="#666666">0</text>
+  <text x="90" y="335" font-family="Arial" font-size="12" text-anchor="end" fill="#666666">2</text>
+  <text x="90" y="290" font-family="Arial" font-size="12" text-anchor="end" fill="#666666">4</text>
+  <text x="90" y="245" font-family="Arial" font-size="12" text-anchor="end" fill="#666666">6</text>
+  <text x="90" y="200" font-family="Arial" font-size="12" text-anchor="end" fill="#666666">8</text>
+  <text x="90" y="155" font-family="Arial" font-size="12" text-anchor="end" fill="#666666">10</text>
+  
+  <!-- X-axis grid lines -->
+  <line x1="100" y1="335" x2="700" y2="335" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="5,5" />
+  <line x1="100" y1="290" x2="700" y2="290" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="5,5" />
+  <line x1="100" y1="245" x2="700" y2="245" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="5,5" />
+  <line x1="100" y1="200" x2="700" y2="200" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="5,5" />
+  <line x1="100" y1="155" x2="700" y2="155" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="5,5" />
+  
+  <!-- Bar chart data -->
+  <!-- Python -->
+  <rect x="150" y="166" width="60" height="214" rx="4" fill="url(#barGradient1)" />
+  <text x="180" y="400" font-family="Arial" font-size="12" text-anchor="middle" fill="#333333">Python</text>
+  <text x="180" y="156" font-family="Arial" font-size="14" text-anchor="middle" fill="#FFFFFF" font-weight="bold">9.2</text>
+  
+  <!-- JavaScript -->
+  <rect x="250" y="170" width="60" height="210" rx="4" fill="url(#barGradient2)" />
+  <text x="280" y="400" font-family="Arial" font-size="12" text-anchor="middle" fill="#333333">JavaScript</text>
+  <text x="280" y="160" font-family="Arial" font-size="14" text-anchor="middle" fill="#FFFFFF" font-weight="bold">9.0</text>
+  
+  <!-- Rust -->
+  <rect x="350" y="232" width="60" height="148" rx="4" fill="url(#barGradient3)" />
+  <text x="380" y="400" font-family="Arial" font-size="12" text-anchor="middle" fill="#333333">Rust</text>
+  <text x="380" y="222" font-family="Arial" font-size="14" text-anchor="middle" fill="#FFFFFF" font-weight="bold">7.4</text>
+  
+  <!-- Go -->
+  <rect x="450" y="188" width="60" height="192" rx="4" fill="url(#barGradient1)" />
+  <text x="480" y="400" font-family="Arial" font-size="12" text-anchor="middle" fill="#333333">Go</text>
+  <text x="480" y="178" font-family="Arial" font-size="14" text-anchor="middle" fill="#FFFFFF" font-weight="bold">8.6</text>
+  
+  <!-- Ruby -->
+  <rect x="550" y="236" width="60" height="144" rx="4" fill="url(#barGradient2)" />
+  <text x="580" y="400" font-family="Arial" font-size="12" text-anchor="middle" fill="#333333">Ruby</text>
+  <text x="580" y="226" font-family="Arial" font-size="14" text-anchor="middle" fill="#FFFFFF" font-weight="bold">7.2</text>
+  
+  <!-- Additional information -->
+  <rect x="40" y="440" width="720" height="40" rx="4" fill="#F5F5F5" />
+  <text x="60" y="465" font-family="Arial" font-size="14" fill="#333333">
+    Chart shows overall scores based on weighted criteria: Job Market (30%), Future Growth (40%), Learning Curve (30%)
+  </text>
+  
+  <!-- Navigation buttons -->
+  <rect x="580" y="110" width="80" height="30" rx="15" fill="#3F51B5" />
+  <text x="620" y="130" font-family="Arial" font-size="12" text-anchor="middle" fill="white">Bar Chart</text>
+  
+  <rect x="670" y="110" width="80" height="30" rx="15" fill="#FFFFFF" stroke="#3F51B5" stroke-width="1" />
+  <text x="710" y="130" font-family="Arial" font-size="12" text-anchor="middle" fill="#3F51B5">Radar</text>
+</svg> 

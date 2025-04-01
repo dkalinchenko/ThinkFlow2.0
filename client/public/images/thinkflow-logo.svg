@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <g fill="#FFFFFF">
+    <!-- Main network nodes -->
+    <circle cx="256" cy="200" r="40" />
+    <circle cx="140" cy="120" r="35" />
+    <circle cx="360" cy="150" r="30" />
+    <circle cx="100" cy="220" r="40" />
+    <circle cx="420" cy="240" r="35" />
+    <circle cx="300" cy="320" r="30" />
+    <circle cx="180" cy="350" r="25" />
+    <circle cx="240" cy="400" r="30" />
+    <circle cx="400" cy="350" r="25" />
+    
+    <!-- Small network nodes -->
+    <circle cx="200" cy="160" r="10" />
+    <circle cx="300" cy="100" r="12" />
+    <circle cx="380" cy="200" r="8" />
+    <circle cx="170" cy="250" r="10" />
+    <circle cx="220" cy="300" r="12" />
+    <circle cx="340" cy="250" r="8" />
+    <circle cx="320" cy="380" r="10" />
+    <circle cx="120" cy="330" r="8" />
+    <circle cx="260" cy="270" r="14" />
+    <circle cx="380" cy="300" r="9" />
+    <circle cx="140" cy="180" r="7" />
+    
+    <!-- Network connections (lines) -->
+    <path d="M256,200 L140,120" stroke="#FFFFFF" stroke-width="6" fill="none" />
+    <path d="M256,200 L360,150" stroke="#FFFFFF" stroke-width="6" fill="none" />
+    <path d="M256,200 L100,220" stroke="#FFFFFF" stroke-width="6" fill="none" />
+    <path d="M256,200 L420,240" stroke="#FFFFFF" stroke-width="6" fill="none" />
+    <path d="M256,200 L300,320" stroke="#FFFFFF" stroke-width="6" fill="none" />
+    <path d="M300,320 L180,350" stroke="#FFFFFF" stroke-width="6" fill="none" />
+    <path d="M300,320 L240,400" stroke="#FFFFFF" stroke-width="6" fill="none" />
+    <path d="M300,320 L400,350" stroke="#FFFFFF" stroke-width="6" fill="none" />
+    <path d="M420,240 L400,350" stroke="#FFFFFF" stroke-width="6" fill="none" />
+    <path d="M100,220 L180,350" stroke="#FFFFFF" stroke-width="6" fill="none" />
+    <path d="M180,350 L240,400" stroke="#FFFFFF" stroke-width="6" fill="none" />
+    
+    <!-- Additional connections to small nodes -->
+    <path d="M256,200 L200,160" stroke="#FFFFFF" stroke-width="3" fill="none" />
+    <path d="M256,200 L170,250" stroke="#FFFFFF" stroke-width="3" fill="none" />
+    <path d="M300,320 L220,300" stroke="#FFFFFF" stroke-width="3" fill="none" />
+    <path d="M300,320 L340,250" stroke="#FFFFFF" stroke-width="3" fill="none" />
+    <path d="M300,320 L320,380" stroke="#FFFFFF" stroke-width="3" fill="none" />
+    <path d="M180,350 L120,330" stroke="#FFFFFF" stroke-width="3" fill="none" />
+    <path d="M300,100 L360,150" stroke="#FFFFFF" stroke-width="3" fill="none" />
+    <path d="M380,200 L420,240" stroke="#FFFFFF" stroke-width="3" fill="none" />
+    <path d="M260,270 L300,320" stroke="#FFFFFF" stroke-width="3" fill="none" />
+    <path d="M380,300 L400,350" stroke="#FFFFFF" stroke-width="3" fill="none" />
+    <path d="M140,180 L100,220" stroke="#FFFFFF" stroke-width="3" fill="none" />
+  </g>
+</svg> 
