@@ -75,6 +75,7 @@ function initializeApp() {
     setupStepNavigation();
     setupSaveToAccount();
     setupDescriptionToggles();
+    initializeDynamicForms(); // Add default criteria and alternatives fields
     
     // If we have a saved decision, go to the saved step
     if (state && state.currentStep) {
@@ -92,6 +93,14 @@ function initializeApp() {
 function loadStateFromStorage() {
     // Don't try to use localStorage at all
     logger.log('STORAGE', 'Storage access not available, using memory state');
+    
+    // Check if we have a decision ID in the form
+    const decisionIdInput = document.getElementById('decisionId');
+    if (decisionIdInput && !state.decisionId) {
+        state.decisionId = decisionIdInput.value;
+        logger.log('STORAGE', 'Retrieved decision ID from form', state.decisionId);
+    }
+    
     return null;
 }
 
@@ -99,6 +108,16 @@ function loadStateFromStorage() {
 function saveStateToStorage() {
     // Don't try to use localStorage at all
     logger.log('STORAGE', 'Storage access not available, using memory state');
+    
+    // Ensure decision ID is set
+    if (!state.decisionId) {
+        const decisionIdInput = document.getElementById('decisionId');
+        if (decisionIdInput) {
+            state.decisionId = decisionIdInput.value;
+            logger.log('STORAGE', 'Set decision ID from form during save', state.decisionId);
+        }
+    }
+    
     return;
 }
 
@@ -216,6 +235,15 @@ function setupFormHandlers() {
             event.preventDefault(); // Prevent form submission
             console.log("Name Next Button Clicked!");
             
+            // Get decision ID from the hidden input
+            const decisionIdInput = document.getElementById('decisionId');
+            if (decisionIdInput) {
+                state.decisionId = decisionIdInput.value;
+                logger.log('FORM', 'Setting decision ID', state.decisionId);
+            } else {
+                logger.error('FORM', 'Decision ID input not found');
+            }
+            
             // Get name input value
             const nameInput = document.getElementById('decisionName');
             if (!nameInput) {
@@ -238,6 +266,9 @@ function setupFormHandlers() {
             // Update state with the name
             state.decision.name = nameValue;
             state.currentStep = 2;
+            
+            // Save state to storage
+            saveStateToStorage();
             
             // Update UI directly without relying on storage
             document.querySelectorAll('.step-container').forEach((container, index) => {
@@ -380,16 +411,39 @@ function setupDescriptionToggles() {
 
 // Initialize dynamic form elements
 function initializeDynamicForms() {
-    // Only add initial fields if the lists are empty
+    logger.log('SETUP', 'Initializing dynamic forms');
+    
+    // Create initial criteria fields
     const criteriaList = document.getElementById('criteriaList');
-    if (criteriaList && criteriaList.children.length === 0) {
-        addCriteriaField();
+    if (criteriaList) {
+        // Always ensure there are at least 2 criteria fields
+        if (criteriaList.children.length < 2) {
+            // Clear existing items if any
+            criteriaList.innerHTML = '';
+            
+            // Add two default criteria fields
+            for (let i = 0; i < 2; i++) {
+                addCriteriaField();
+            }
+        }
     }
     
+    // Create initial alternatives fields
     const alternativesList = document.getElementById('alternativesList');
-    if (alternativesList && alternativesList.children.length === 0) {
-        addAlternativeField();
+    if (alternativesList) {
+        // Always ensure there are at least 2 alternative fields
+        if (alternativesList.children.length < 2) {
+            // Clear existing items if any
+            alternativesList.innerHTML = '';
+            
+            // Add two default alternative fields
+            for (let i = 0; i < 2; i++) {
+                addAlternativeField();
+            }
+        }
     }
+    
+    logger.log('SETUP', 'Dynamic forms initialized');
 }
 
 // Handle form submissions
@@ -474,16 +528,21 @@ async function handleFormSubmit(form, step) {
                 
             case 'weightsForm':
                 const weights = {};
+                let totalWeightValue = 0;
+                
                 state.decision.criteria.forEach(criterion => {
-                    const weight = formData.get(`weights[${criterion}]`);
-                    weights[criterion] = parseFloat(weight) || 5;
+                    const weight = parseFloat(formData.get(`weights[${criterion}]`)) || 0;
+                    weights[criterion] = weight;
+                    totalWeightValue += weight;
                 });
                 
-                // Normalize weights
-                const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
-                state.decision.criteria.forEach(criterion => {
-                    weights[criterion] = weights[criterion] / totalWeight;
-                });
+                // If weights don't sum to 100%, normalize them
+                if (totalWeightValue !== 100 && totalWeightValue > 0) {
+                    logger.debug('WEIGHTS', `Normalizing weights from ${totalWeightValue}% to 100%`);
+                    state.decision.criteria.forEach(criterion => {
+                        weights[criterion] = (weights[criterion] / totalWeightValue) * 100;
+                    });
+                }
                 
                 // Update state directly
                 state.decision.weights = weights;
@@ -780,17 +839,34 @@ function prepareWeightFields(criteria) {
         
         // Add explanation
         const explanation = document.createElement('p');
-        explanation.textContent = 'How important is each criterion? Slide to set importance (1-10)';
+        explanation.textContent = 'How important is each criterion? Set the weight as a percentage (0-100%). Ideally, weights should sum to 100%.';
         form.appendChild(explanation);
         
-            // Create fields container
-            const fieldsContainer = document.createElement('div');
-            fieldsContainer.className = 'weight-fields-container';
-            form.appendChild(fieldsContainer);
-            
-            // Create weight fields for each criterion
-            criteria.forEach(criterion => {
-                const field = document.createElement('div');
+        // Create fields container
+        const fieldsContainer = document.createElement('div');
+        fieldsContainer.className = 'weight-fields-container';
+        form.appendChild(fieldsContainer);
+        
+        // Ensure we have weights or initialize with equal percentages
+        if (!state.decision.weights) {
+            state.decision.weights = {};
+        }
+        
+        // If weights aren't set, initialize with equal percentages
+        const defaultPercentage = Math.round(100 / criteria.length);
+        let hasSetWeights = false;
+        
+        criteria.forEach(criterion => {
+            if (state.decision.weights[criterion]) {
+                hasSetWeights = true;
+            } else {
+                state.decision.weights[criterion] = defaultPercentage;
+            }
+        });
+        
+        // Create weight fields for each criterion
+        criteria.forEach(criterion => {
+            const field = document.createElement('div');
             field.className = 'mb-4 weight-field';
             
             const labelContainer = document.createElement('div');
@@ -804,7 +880,7 @@ function prepareWeightFields(criteria) {
             const valueDisplay = document.createElement('span');
             valueDisplay.className = 'badge bg-primary';
             valueDisplay.id = `weight-value-${criterion.replace(/\s+/g, '-')}`;
-            valueDisplay.textContent = state.decision.weights[criterion] || '5';
+            valueDisplay.textContent = Math.round(state.decision.weights[criterion] || defaultPercentage) + '%';
             
             labelContainer.appendChild(label);
             labelContainer.appendChild(valueDisplay);
@@ -817,15 +893,16 @@ function prepareWeightFields(criteria) {
             input.className = 'form-range';
             input.id = `weights[${criterion}]`;
             input.name = `weights[${criterion}]`;
-            input.min = '1';
-            input.max = '10';
+            input.min = '0';
+            input.max = '100';
             input.step = '1';
             input.required = true;
-            input.value = state.decision.weights[criterion] || '5';
+            input.value = Math.round(state.decision.weights[criterion] || defaultPercentage);
             
             // Update value display when slider moves
             input.addEventListener('input', function() {
-                valueDisplay.textContent = this.value;
+                valueDisplay.textContent = this.value + '%';
+                updateTotalWeightDisplay();
             });
             
             sliderContainer.appendChild(input);
@@ -833,43 +910,97 @@ function prepareWeightFields(criteria) {
             // Create tick marks for the slider (optional)
             const tickMarks = document.createElement('div');
             tickMarks.className = 'd-flex justify-content-between px-2 mt-1';
-            for (let i = 1; i <= 10; i++) {
+            for (let i = 0; i <= 100; i += 20) {
                 const tick = document.createElement('small');
                 tick.className = 'text-muted';
-                tick.textContent = i;
+                tick.textContent = i + '%';
                 tickMarks.appendChild(tick);
             }
             
             field.appendChild(labelContainer);
             field.appendChild(sliderContainer);
             field.appendChild(tickMarks);
-                fieldsContainer.appendChild(field);
+            fieldsContainer.appendChild(field);
+        });
+        
+        // Add a total weight indicator
+        const totalWeightContainer = document.createElement('div');
+        totalWeightContainer.className = 'alert alert-info mt-3 mb-4';
+        totalWeightContainer.id = 'total-weight-container';
+        
+        const totalWeightText = document.createElement('div');
+        totalWeightText.id = 'total-weight-text';
+        totalWeightText.className = 'mb-2';
+        totalWeightText.textContent = 'Total weight: 0%';
+        
+        const progressContainer = document.createElement('div');
+        progressContainer.className = 'progress';
+        
+        const progressBar = document.createElement('div');
+        progressBar.id = 'total-weight-progress';
+        progressBar.className = 'progress-bar';
+        progressBar.setAttribute('role', 'progressbar');
+        progressBar.style.width = '0%';
+        
+        progressContainer.appendChild(progressBar);
+        totalWeightContainer.appendChild(totalWeightText);
+        totalWeightContainer.appendChild(progressContainer);
+        
+        fieldsContainer.appendChild(totalWeightContainer);
+        
+        // Function to update the total weight display
+        window.updateTotalWeightDisplay = function() {
+            let totalWeight = 0;
+            criteria.forEach(criterion => {
+                const weightInput = document.getElementById(`weights[${criterion}]`);
+                if (weightInput) {
+                    totalWeight += parseInt(weightInput.value, 10) || 0;
+                }
             });
             
-            // Add submit button
-            const submitBtn = document.createElement('button');
-            submitBtn.type = 'submit';
+            const totalWeightText = document.getElementById('total-weight-text');
+            const progressBar = document.getElementById('total-weight-progress');
+            
+            if (totalWeightText && progressBar) {
+                totalWeightText.textContent = `Total weight: ${totalWeight}%`;
+                
+                // Update progress bar
+                const progressWidth = Math.min(totalWeight, 100);
+                progressBar.style.width = `${progressWidth}%`;
+                
+                // Set color based on how close to 100% we are
+                if (totalWeight === 100) {
+                    progressBar.className = 'progress-bar bg-success';
+                    totalWeightText.className = 'mb-2 text-success';
+                } else if (totalWeight > 90 && totalWeight < 110) {
+                    progressBar.className = 'progress-bar bg-warning';
+                    totalWeightText.className = 'mb-2 text-warning';
+                } else {
+                    progressBar.className = 'progress-bar bg-danger';
+                    totalWeightText.className = 'mb-2 text-danger';
+                }
+            }
+        };
+        
+        // Initialize the total weight display
+        setTimeout(updateTotalWeightDisplay, 100);
+        
+        // Add the submit button
+        const submitBtn = document.createElement('button');
+        submitBtn.type = 'submit';
         submitBtn.className = 'btn btn-primary mt-3';
-            submitBtn.textContent = 'Continue to Step 4';
-            form.appendChild(submitBtn);
-            
-            // Attach submit event listener
-            form.addEventListener('submit', async (event) => {
-                event.preventDefault();
-                await handleFormSubmit(form, 3);
-            });
-            
-        logger.log('WEIGHTS', 'Successfully created weight fields with sliders');
-            return true;
+        submitBtn.textContent = 'Next';
+        form.appendChild(submitBtn);
+        
+        // Add form submission listener
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleFormSubmit(this, 3);
+        });
+        
+        return true;
     } catch (error) {
-        logger.error('WEIGHTS', 'Error creating weight fields', error);
-        weightsFormContainer.innerHTML = `
-            <div class="alert alert-danger">
-                <h4>Error Creating Form</h4>
-                <p>${error.message}</p>
-                <button class="btn btn-primary" onclick="window.location.reload()">Reload Page</button>
-            </div>
-        `;
+        logger.error('WEIGHTS', 'Error preparing weight fields', error);
         return false;
     }
 }
@@ -877,7 +1008,7 @@ function prepareWeightFields(criteria) {
 // Add a new criteria field
 function addCriteriaField(event) {
     logger.log('CRITERIA', 'Adding new criteria field');
-    event.preventDefault();
+    if (event) event.preventDefault();
     
     const criteriaList = document.getElementById('criteriaList');
     if (!criteriaList) {
@@ -885,11 +1016,15 @@ function addCriteriaField(event) {
         return;
     }
     
+    // Determine the index for placeholder text
+    const criteriaCount = criteriaList.querySelectorAll('.criteria-item').length + 1;
+    const placeholderText = `Criterion ${criteriaCount}`;
+    
     const newItem = document.createElement('div');
     newItem.className = 'criteria-item';
     newItem.innerHTML = `
         <div class="input-group mb-2">
-            <input type="text" class="form-control" name="criteria[]" placeholder="Enter criterion" required>
+            <input type="text" class="form-control" name="criteria[]" placeholder="${placeholderText}" required>
             <button type="button" class="btn btn-outline-danger remove-btn">Remove</button>
         </div>
         <div class="collapse mt-2 mb-3">
@@ -924,7 +1059,7 @@ function addCriteriaField(event) {
 // Add a new alternative field
 function addAlternativeField(event) {
     logger.log('ALTERNATIVES', 'Adding new alternative field');
-    event.preventDefault();
+    if (event) event.preventDefault();
     
     const alternativesList = document.getElementById('alternativesList');
     if (!alternativesList) {
@@ -932,11 +1067,15 @@ function addAlternativeField(event) {
         return;
     }
     
+    // Determine the index for placeholder text
+    const alternativesCount = alternativesList.querySelectorAll('.alternative-item').length + 1;
+    const placeholderText = `Alternative ${alternativesCount}`;
+    
     const newItem = document.createElement('div');
     newItem.className = 'alternative-item';
     newItem.innerHTML = `
         <div class="input-group mb-2">
-            <input type="text" class="form-control" name="alternatives[]" placeholder="Enter alternative" required>
+            <input type="text" class="form-control" name="alternatives[]" placeholder="${placeholderText}" required>
             <button type="button" class="btn btn-outline-danger remove-btn">Remove</button>
         </div>
         <div class="collapse mt-2 mb-3">
@@ -972,6 +1111,19 @@ function addAlternativeField(event) {
 async function showResults(results, currentState) {
     try {
         logger.log('RESULTS_DISPLAY', 'Processing results for display', results);
+        
+        // If state.decisionId is not set, try to get it from the form
+        if (!state.decisionId) {
+            const decisionIdInput = document.getElementById('decisionId');
+            if (decisionIdInput) {
+                state.decisionId = decisionIdInput.value;
+                logger.log('RESULTS_DISPLAY', 'Retrieved decision ID from form', state.decisionId);
+            } else {
+                // Generate a new decision ID if none exists
+                state.decisionId = 'decision_' + Date.now();
+                logger.log('RESULTS_DISPLAY', 'Generated new decision ID', state.decisionId);
+            }
+        }
         
         // Validate results and current state
         if (!results || typeof results !== 'object') {
@@ -1046,12 +1198,31 @@ async function showResults(results, currentState) {
             criteriaWeightsList.innerHTML = '';
             
             currentState.criteria.forEach(criterion => {
-                const weight = currentState.weights[criterion];
+                const rawWeight = currentState.weights[criterion];
+                // Convert weight to percentage if needed
+                let weightValue;
+                
+                if (typeof rawWeight === 'number') {
+                    if (rawWeight >= 0 && rawWeight <= 1) {
+                        // Convert decimal weights (0-1) to percentage (0-100%)
+                        weightValue = Math.round(rawWeight * 100);
+                    } else if (rawWeight >= 1 && rawWeight <= 10 && currentState.criteria.length > 1) {
+                        // Convert old scale (1-10) to percentage if multiple criteria exist
+                        weightValue = Math.round((rawWeight / 10) * 100);
+                    } else {
+                        // Assume it's already a percentage
+                        weightValue = Math.round(rawWeight);
+                    }
+                } else {
+                    // Default to equal distribution if weight is missing or invalid
+                    weightValue = Math.round(100 / currentState.criteria.length);
+                }
+                
                 const li = document.createElement('li');
                 li.className = 'list-group-item d-flex justify-content-between align-items-center';
                 li.innerHTML = `
                     ${criterion}
-                    <span class="badge bg-primary rounded-pill">Weight: ${weight.toFixed(2)}</span>
+                    <span class="badge bg-primary rounded-pill">Weight: ${weightValue}%</span>
                 `;
                 criteriaWeightsList.appendChild(li);
             });
@@ -1079,6 +1250,9 @@ async function showResults(results, currentState) {
             logger.error('RESULTS_DISPLAY', 'Error creating chart', chartError);
             // Don't fail the whole results display if just the chart fails
         }
+        
+        // Set up collaboration buttons if present
+        setupCollaborationButtons(currentState);
         
         // Set up the Save to Account button if present
         const saveToAccountBtn = document.getElementById('save-to-account-btn');
@@ -1143,6 +1317,85 @@ async function showResults(results, currentState) {
     } catch (error) {
         logger.error('RESULTS_DISPLAY', 'Error displaying results', error);
         showError('Error displaying results: ' + error.message);
+    }
+}
+
+// Set up collaboration buttons
+function setupCollaborationButtons(currentState) {
+    // Invite for Criteria Weights button
+    const inviteCriteriaBtn = document.getElementById('invite-criteria-weights-btn');
+    if (inviteCriteriaBtn) {
+        // Remove any existing event listeners
+        const newInviteCriteriaBtn = inviteCriteriaBtn.cloneNode(true);
+        inviteCriteriaBtn.parentNode.replaceChild(newInviteCriteriaBtn, inviteCriteriaBtn);
+        
+        newInviteCriteriaBtn.addEventListener('click', function() {
+            navigateToCollaborationSetup('criteria-weights', currentState);
+        });
+    }
+    
+    // Invite for Alternative Evaluation button
+    const inviteAlternativesBtn = document.getElementById('invite-alternatives-eval-btn');
+    if (inviteAlternativesBtn) {
+        // Remove any existing event listeners
+        const newInviteAlternativesBtn = inviteAlternativesBtn.cloneNode(true);
+        inviteAlternativesBtn.parentNode.replaceChild(newInviteAlternativesBtn, inviteAlternativesBtn);
+        
+        newInviteAlternativesBtn.addEventListener('click', function() {
+            navigateToCollaborationSetup('alternatives-evaluation', currentState);
+        });
+    }
+}
+
+// Navigate to collaboration setup page
+async function navigateToCollaborationSetup(type, currentState) {
+    try {
+        if (!state.decisionId) {
+            throw new Error('Decision ID is missing');
+        }
+        
+        logger.log('COLLABORATION', `Setting up collaboration for ${type}`, {
+            decisionId: state.decisionId,
+            name: currentState.name
+        });
+        
+        // First, ensure the decision is saved
+        if (document.getElementById('save-to-account-btn')) {
+            // If the user is logged in, we can save the decision first
+            try {
+                const saveData = {
+                    decisionId: state.decisionId,
+                    name: currentState.name,
+                    criteria: currentState.criteria,
+                    weights: currentState.weights,
+                    alternatives: currentState.alternatives,
+                    evaluations: currentState.evaluations,
+                    results: currentState.results
+                };
+                
+                const response = await fetch('/save-to-account', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(saveData)
+                });
+                
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to save decision');
+                }
+            } catch (saveError) {
+                logger.warn('COLLABORATION', 'Could not save decision, proceeding anyway', saveError);
+                // We will continue without saving
+            }
+        }
+        
+        // Navigate to the collaboration setup page
+        window.location.href = `/collaboration-setup/${state.decisionId}/${type}`;
+    } catch (error) {
+        logger.error('COLLABORATION', 'Error setting up collaboration', error);
+        showError('Error setting up collaboration: ' + error.message);
     }
 }
 
@@ -1431,34 +1684,92 @@ function calculateButtonHandler(event) {
         
         logger.log('EVALUATION', 'Collected evaluations:', evaluations);
         
-        // Update state directly
-        state.decision.evaluations = evaluations;
-        state.currentStep = 6;
+        // Show loading state
+        const calculateButton = event.target;
+        const originalButtonText = calculateButton.innerHTML;
+        calculateButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calculating...';
+        calculateButton.disabled = true;
         
-        // Navigate to step 6 directly
-        document.querySelectorAll('.step-container').forEach((container, index) => {
-            if (index + 1 === 6) {
-                container.classList.add('active');
-                container.style.display = 'block';
+        // Prepare data for submission
+        const submissionData = {
+            step: 5,
+            data: {
+                id: state.decisionId,
+                evaluations: evaluations
+            },
+            currentState: state.decision
+        };
+        
+        // Submit data to the server
+        fetch('/save-step', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(submissionData)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                logger.log('EVALUATION', 'Evaluation data saved successfully', result);
+                
+                // Check if we should redirect to view-decision page
+                if (result.redirect) {
+                    // Redirect to the view-decision page
+                    logger.log('EVALUATION', 'Redirecting to view-decision page', result.redirect);
+                    window.location.href = result.redirect;
+                    return;
+                }
+                
+                // If no redirect, fall back to the old behavior
+                // Update state
+                state.decision.evaluations = evaluations;
+                state.currentStep = 6;
+                
+                // Navigate to step 6 directly
+                document.querySelectorAll('.step-container').forEach((container, index) => {
+                    if (index + 1 === 6) {
+                        container.classList.add('active');
+                        container.style.display = 'block';
+                    } else {
+                        container.classList.remove('active');
+                        container.style.display = 'none';
+                    }
+                });
+                
+                // Update step indicators
+                document.querySelectorAll('.step-indicator .step').forEach((indicator, index) => {
+                    if (index + 1 <= 6) {
+                        indicator.classList.add('active');
+                    } else {
+                        indicator.classList.remove('active');
+                    }
+                });
+                
+                // Calculate and display results
+                if (result.results) {
+                    state.decision.results = result.results;
+                    saveStateToStorage();
+                }
+                
+                recalculateResults();
+                
+                console.log("Navigation to step 6 (results) complete");
             } else {
-                container.classList.remove('active');
-                container.style.display = 'none';
+                // Handle error
+                logger.error('EVALUATION', 'Error saving evaluation data', result.error);
+                showError('Error: ' + (result.error || 'Failed to save evaluation data'));
             }
+        })
+        .catch(error => {
+            logger.error('EVALUATION', 'Error in fetch operation', error);
+            showError('Connection error. Please try again.');
+        })
+        .finally(() => {
+            // Reset button state
+            calculateButton.innerHTML = originalButtonText;
+            calculateButton.disabled = false;
         });
-        
-        // Update step indicators
-        document.querySelectorAll('.step-indicator .step').forEach((indicator, index) => {
-            if (index + 1 <= 6) {
-                indicator.classList.add('active');
-            } else {
-                indicator.classList.remove('active');
-            }
-        });
-        
-        // Calculate and display results
-        recalculateResults();
-        
-        console.log("Navigation to step 6 (results) complete");
     } catch (error) {
         logger.error('EVALUATION', 'Error handling evaluation calculation:', error);
         showError('An error occurred while calculating results. Please try again.');
@@ -1780,24 +2091,44 @@ function setupDynamicWeights(criteria, initialWeights) {
         if (!state.originalWeights || Object.keys(state.originalWeights).length === 0) {
             state.originalWeights = {};
             criteria.forEach(criterion => {
-                // Convert decimal weights to 1-10 scale or set default
+                // Handle different weight formats and convert to percentage (0-100)
                 const origWeight = initialWeights[criterion];
-                state.originalWeights[criterion] = origWeight >= 0 && origWeight <= 1 ? 
-                    Math.round(origWeight * 10) : (origWeight || 5);
+                if (origWeight === undefined || origWeight === null) {
+                    // Default value if weight is not set
+                    state.originalWeights[criterion] = 100 / criteria.length;
+                } else if (origWeight >= 0 && origWeight <= 1) {
+                    // Convert decimal weights (0-1) to percentage (0-100)
+                    state.originalWeights[criterion] = Math.round(origWeight * 100);
+                } else {
+                    // Use raw value, assuming it's already a percentage or old 1-10 scale
+                    // For old 1-10 scale, will convert below
+                    state.originalWeights[criterion] = origWeight;
+                }
             });
             logger.log('WEIGHTS', 'Original weights stored:', state.originalWeights);
         }
         
         // Create a slider for each criterion
         criteria.forEach(criterion => {
-            // Convert decimal weights to 1-10 scale or use raw value if already on that scale
+            // Handle different weight formats and convert to percentage (0-100)
             let weight = initialWeights[criterion];
-            // If weight is a decimal between 0-1, scale it to 1-10
-            if (weight >= 0 && weight <= 1) {
-                weight = Math.round(weight * 10);
+            
+            // Convert weight to percentage format
+            if (weight === undefined || weight === null) {
+                // Default value if weight is not set
+                weight = Math.round(100 / criteria.length);
+            } else if (weight >= 0 && weight <= 1) {
+                // Convert decimal weights (0-1) to percentage (0-100)
+                weight = Math.round(weight * 100);
+            } else if (weight >= 1 && weight <= 10 && criteria.length > 0) {
+                // Convert old scale (1-10) to percentage
+                // Only do this conversion if we have specific evidence it's the old scale
+                // (values between 1-10 and multiple criteria)
+                weight = Math.round((weight / 10) * 100);
             }
-            // Ensure weight is within 1-10 range
-            weight = Math.max(1, Math.min(10, weight || 5));
+            
+            // Ensure weight is within 0-100 range
+            weight = Math.max(0, Math.min(100, Math.round(weight)));
             
             const sliderContainer = document.createElement('div');
             sliderContainer.className = 'mb-3';
@@ -1812,7 +2143,7 @@ function setupDynamicWeights(criteria, initialWeights) {
             const valueDisplay = document.createElement('span');
             valueDisplay.className = 'badge bg-primary';
             valueDisplay.id = `weight-${criterion}-value`;
-            valueDisplay.textContent = weight;
+            valueDisplay.textContent = weight + '%';
             
             labelContainer.appendChild(label);
             labelContainer.appendChild(valueDisplay);
@@ -1821,8 +2152,8 @@ function setupDynamicWeights(criteria, initialWeights) {
             input.type = 'range';
             input.className = 'form-range weight-slider';
             input.id = `weight-${criterion}`;
-            input.min = '1';
-            input.max = '10';
+            input.min = '0';
+            input.max = '100';
             input.step = '1';
             input.value = weight;
             input.setAttribute('data-criterion', criterion);
@@ -1830,7 +2161,7 @@ function setupDynamicWeights(criteria, initialWeights) {
             // Simple function to update weight value without normalization
             const updateWeight = function() {
                 const newWeight = parseInt(this.value);
-                valueDisplay.textContent = newWeight;
+                valueDisplay.textContent = newWeight + '%';
                 
                 // Update weight in state directly
                 state.decision.weights[criterion] = newWeight;
@@ -1838,7 +2169,7 @@ function setupDynamicWeights(criteria, initialWeights) {
                 // Recalculate results with updated weights
                 recalculateResults();
                 
-                logger.log('WEIGHTS', `Updated weight for ${criterion}: ${newWeight}`);
+                logger.log('WEIGHTS', `Updated weight for ${criterion}: ${newWeight}%`);
             };
             
             input.addEventListener('input', updateWeight);
@@ -1848,7 +2179,7 @@ function setupDynamicWeights(criteria, initialWeights) {
             sliderContainer.appendChild(input);
             
             weightSlidersContainer.appendChild(sliderContainer);
-            logger.log('WEIGHTS', `Created weight slider for ${criterion}: ${weight}`);
+            logger.log('WEIGHTS', `Created weight slider for ${criterion}: ${weight}%`);
         });
         
         // Add button container
@@ -1860,8 +2191,9 @@ function setupDynamicWeights(criteria, initialWeights) {
         resetEqualButton.className = 'btn btn-outline-secondary';
         resetEqualButton.textContent = 'Reset to Equal Weights';
         resetEqualButton.onclick = function() {
+            const equalWeight = Math.round(100 / criteria.length);
             criteria.forEach(criterion => {
-                state.decision.weights[criterion] = 5; // Middle value
+                state.decision.weights[criterion] = equalWeight; // Equal percentage
             });
             
             // Update sliders to show the new values
@@ -1870,13 +2202,13 @@ function setupDynamicWeights(criteria, initialWeights) {
                 const valueDisplay = document.getElementById(`weight-${criterion}-value`);
                 
                 if (slider && valueDisplay) {
-                    slider.value = 5;
-                    valueDisplay.textContent = 5;
+                    slider.value = equalWeight;
+                    valueDisplay.textContent = equalWeight + '%';
                 }
             });
             
             recalculateResults();
-            logger.log('WEIGHTS', 'Reset to equal weights (all set to 5)');
+            logger.log('WEIGHTS', `Reset to equal weights (all set to ${equalWeight}%)`);
         };
         
         // Add a "Reset to Original Weights" button
@@ -1886,7 +2218,8 @@ function setupDynamicWeights(criteria, initialWeights) {
         resetOriginalButton.onclick = function() {
             if (state.originalWeights && Object.keys(state.originalWeights).length > 0) {
                 criteria.forEach(criterion => {
-                    state.decision.weights[criterion] = state.originalWeights[criterion] || 5;
+                    const origWeight = state.originalWeights[criterion] || Math.round(100 / criteria.length);
+                    state.decision.weights[criterion] = origWeight;
                 });
                 
                 // Update sliders to show the original values
@@ -1895,8 +2228,9 @@ function setupDynamicWeights(criteria, initialWeights) {
                     const valueDisplay = document.getElementById(`weight-${criterion}-value`);
                     
                     if (slider && valueDisplay) {
-                        slider.value = state.originalWeights[criterion] || 5;
-                        valueDisplay.textContent = state.originalWeights[criterion] || 5;
+                        const weight = state.originalWeights[criterion] || Math.round(100 / criteria.length);
+                        slider.value = weight;
+                        valueDisplay.textContent = weight + '%';
                     }
                 });
                 
@@ -1911,6 +2245,63 @@ function setupDynamicWeights(criteria, initialWeights) {
         buttonContainer.appendChild(resetEqualButton);
         buttonContainer.appendChild(resetOriginalButton);
         weightSlidersContainer.appendChild(buttonContainer);
+        
+        // Add a total weight indicator
+        const totalWeightContainer = document.createElement('div');
+        totalWeightContainer.className = 'alert alert-info mt-3';
+        totalWeightContainer.id = 'total-weight-container';
+        
+        const totalWeightText = document.createElement('div');
+        totalWeightText.id = 'total-weight-text';
+        totalWeightText.className = 'mb-2';
+        
+        const progressContainer = document.createElement('div');
+        progressContainer.className = 'progress';
+        
+        const progressBar = document.createElement('div');
+        progressBar.id = 'total-weight-progress';
+        progressBar.className = 'progress-bar';
+        progressBar.setAttribute('role', 'progressbar');
+        
+        progressContainer.appendChild(progressBar);
+        totalWeightContainer.appendChild(totalWeightText);
+        totalWeightContainer.appendChild(progressContainer);
+        
+        weightSlidersContainer.appendChild(totalWeightContainer);
+        
+        // Function to update the total weight display
+        const updateTotalWeightDisplay = function() {
+            let totalWeight = 0;
+            criteria.forEach(criterion => {
+                const slider = document.getElementById(`weight-${criterion}`);
+                if (slider) {
+                    totalWeight += parseInt(slider.value, 10) || 0;
+                }
+            });
+            
+            if (totalWeightText && progressBar) {
+                totalWeightText.textContent = `Total weight: ${totalWeight}%`;
+                
+                // Update progress bar
+                const progressWidth = Math.min(totalWeight, 100);
+                progressBar.style.width = `${progressWidth}%`;
+                
+                // Set color based on how close to 100% we are
+                if (totalWeight === 100) {
+                    progressBar.className = 'progress-bar bg-success';
+                    totalWeightText.className = 'mb-2 text-success';
+                } else if (totalWeight > 90 && totalWeight < 110) {
+                    progressBar.className = 'progress-bar bg-warning';
+                    totalWeightText.className = 'mb-2 text-warning';
+                } else {
+                    progressBar.className = 'progress-bar bg-danger';
+                    totalWeightText.className = 'mb-2 text-danger';
+                }
+            }
+        };
+        
+        // Initialize the total weight display
+        setTimeout(updateTotalWeightDisplay, 100);
         
         logger.log('WEIGHTS', 'Dynamic weights setup completed');
     } catch (error) {
@@ -1946,13 +2337,23 @@ function recalculateResults() {
             return null;
         }
         
+        // Normalize weights to sum to 1 for calculation purposes
+        const totalWeight = criteria.reduce((sum, criterion) => {
+            return sum + (weights[criterion] || 0);
+        }, 0);
+        
+        const normalizedWeights = {};
+        criteria.forEach(criterion => {
+            // Convert percentage weights (0-100) to decimal (0-1)
+            normalizedWeights[criterion] = totalWeight > 0 ? 
+                (weights[criterion] || 0) / totalWeight : 
+                1 / criteria.length; // Equal weights if total is 0
+        });
+        
+        logger.log('RESULTS', 'Normalized weights for calculation', normalizedWeights);
+        
         // Recalculate scores
         const results = {};
-        
-        // Calculate the maximum possible score
-        const maxPossibleScore = criteria.reduce((total, criterion) => {
-            return total + (10 * weights[criterion]); // 10 is max evaluation score
-        }, 0);
         
         // For each alternative
         alternatives.forEach(alternative => {
@@ -1966,14 +2367,14 @@ function recalculateResults() {
             
             // For each criterion
             criteria.forEach(criterion => {
-                const weight = weights[criterion] || 5; // Default to middle weight if missing
+                const normalizedWeight = normalizedWeights[criterion];
                 const evaluation = evaluations[alternative][criterion] || 0;
                 
                 // Weighted score for this criterion
-                const weightedScore = (weight / 10) * evaluation; // Normalize weight to 0-1 scale
+                const weightedScore = normalizedWeight * evaluation;
                 totalScore += weightedScore;
                 
-                logger.log('RESULTS', `${alternative}/${criterion}: ${evaluation} * ${weight/10} = ${weightedScore}`);
+                logger.log('RESULTS', `${alternative}/${criterion}: ${evaluation} * ${normalizedWeight.toFixed(4)} = ${weightedScore.toFixed(4)}`);
             });
             
             // Store final score

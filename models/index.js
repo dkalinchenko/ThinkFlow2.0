@@ -5,7 +5,7 @@ const logger = require('../utils/logger');
 // Initialize Sequelize with SQLite for development and PostgreSQL for production
 let sequelize;
 if (process.env.NODE_ENV === 'production') {
-  // Use PostgreSQL in production (Render)
+  // Use PostgreSQL in production
   sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: 'postgres',
     protocol: 'postgres',
@@ -27,20 +27,8 @@ if (process.env.NODE_ENV === 'production') {
   // Use SQLite in development
   sequelize = new Sequelize({
     dialect: 'sqlite',
-    storage: path.join(__dirname, '../database.sqlite'),
-    logging: false,
-    pool: {
-      max: 10,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
-    },
-    retry: {
-      max: 3
-    },
-    dialectOptions: {
-      timeout: 15000
-    }
+    storage: path.join(__dirname, '../database-new.sqlite'),
+    logging: false
   });
 }
 
@@ -53,6 +41,18 @@ sequelize
   .catch(err => {
     logger.error('DATABASE', 'Unable to connect to the database', err);
   });
+
+// Helper function for JSON fields to avoid repetition
+const jsonField = (defaultValue) => ({
+  type: DataTypes.TEXT,
+  get() {
+    const value = this.getDataValue(this._currentField);
+    return value ? JSON.parse(value) : defaultValue;
+  },
+  set(value) {
+    this.setDataValue(this._currentField, JSON.stringify(value));
+  }
+});
 
 // Define User model
 const User = sequelize.define('User', {
@@ -90,55 +90,30 @@ const Decision = sequelize.define('Decision', {
     type: DataTypes.STRING,
     allowNull: false
   },
+  // Simplified JSON field definitions using our helper function
   criteria: {
-    type: DataTypes.TEXT, // Store as JSON string
-    get() {
-      const value = this.getDataValue('criteria');
-      return value ? JSON.parse(value) : [];
-    },
-    set(value) {
-      this.setDataValue('criteria', JSON.stringify(value));
-    }
+    ...jsonField([]),
+    _currentField: 'criteria'
   },
   weights: {
-    type: DataTypes.TEXT, // Store as JSON string
-    get() {
-      const value = this.getDataValue('weights');
-      return value ? JSON.parse(value) : {};
-    },
-    set(value) {
-      this.setDataValue('weights', JSON.stringify(value));
-    }
+    ...jsonField({}),
+    _currentField: 'weights'
   },
   alternatives: {
-    type: DataTypes.TEXT, // Store as JSON string
-    get() {
-      const value = this.getDataValue('alternatives');
-      return value ? JSON.parse(value) : [];
-    },
-    set(value) {
-      this.setDataValue('alternatives', JSON.stringify(value));
-    }
+    ...jsonField([]),
+    _currentField: 'alternatives'
   },
   evaluations: {
-    type: DataTypes.TEXT, // Store as JSON string
-    get() {
-      const value = this.getDataValue('evaluations');
-      return value ? JSON.parse(value) : {};
-    },
-    set(value) {
-      this.setDataValue('evaluations', JSON.stringify(value));
-    }
+    ...jsonField({}),
+    _currentField: 'evaluations'
   },
   results: {
-    type: DataTypes.TEXT, // Store as JSON string
-    get() {
-      const value = this.getDataValue('results');
-      return value ? JSON.parse(value) : {};
-    },
-    set(value) {
-      this.setDataValue('results', JSON.stringify(value));
-    }
+    ...jsonField({}),
+    _currentField: 'results'
+  },
+  participants: {
+    ...jsonField({ weights: [], evaluations: [] }),
+    _currentField: 'participants'
   }
 });
 
@@ -146,32 +121,27 @@ const Decision = sequelize.define('Decision', {
 User.hasMany(Decision, { foreignKey: 'userId' });
 Decision.belongsTo(User, { foreignKey: 'userId' });
 
+// Adding instance methods to Decision model for common operations
+Decision.prototype.calculateScore = function(alternative, weights, evaluations) {
+  return Object.keys(weights).reduce((total, criterion) => {
+    const weight = weights[criterion] / 100; // Convert percentage to decimal
+    const score = evaluations[alternative][criterion] || 0;
+    return total + (weight * score);
+  }, 0);
+};
+
 // Sync models with database
 const initDatabase = async () => {
   try {
-    await sequelize.sync({ alter: true });
-    logger.info('DATABASE', 'Database synchronized successfully');
+    await sequelize.authenticate();
+    logger.info('DATABASE', 'Connection established successfully');
+    
+    await sequelize.sync({ force: false });
+    logger.info('DATABASE', 'All models synchronized successfully');
+    
     return true;
   } catch (error) {
-    logger.error('DATABASE', 'Error synchronizing database', error);
-    
-    // Try to recover by creating a new database file if it doesn't exist
-    const fs = require('fs');
-    const dbPath = path.join(__dirname, '../database.sqlite');
-    
-    if (!fs.existsSync(dbPath)) {
-      logger.warn('DATABASE', 'Database file not found, creating a new one');
-      try {
-        fs.writeFileSync(dbPath, '');
-        await sequelize.sync({ force: true });
-        logger.info('DATABASE', 'Created new database successfully');
-        return true;
-      } catch (createError) {
-        logger.error('DATABASE', 'Failed to create new database', createError);
-        return false;
-      }
-    }
-    
+    logger.error('DATABASE', 'Failed to initialize database', error);
     return false;
   }
 };

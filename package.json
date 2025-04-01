@@ -6,7 +6,29 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:workflow": "node tests/complete-workflow-test.js",
+    "test:homepage": "node tests/workflow/homepage.test.js",
+    "test:new-decision": "node tests/workflow/new-decision.test.js",
+    "test:add-criteria": "node tests/workflow/add-criteria.test.js",
+    "test:all": "node tests/run-all-tests.js",
+    "test:validation": "node tests/validation-test.js",
+    "test:calculation": "node tests/calculation-test.js",
+    "test:error-handling": "node tests/error-handling-test.js",
+    "test:workflow-fixed": "node tests/workflow-fixed.js",
+    "test:validation-fixed": "node tests/validation-fixed.js",
+    "test:calculation-fixed": "node tests/calculation-fixed.js",
+    "test:error-handling-fixed": "node tests/error-handling-fixed.js",
+    "test:all-fixed": "node tests/run-all-fixed.js",
+    "test:decision-creation": "node tests/features/decision-creation.js",
+    "test:criteria-management": "node tests/features/criteria-management.js",
+    "test:alternative-evaluation": "node tests/features/alternative-evaluation.js",
+    "test:score-calculation": "node tests/features/score-calculation.js",
+    "test:decision-results": "node tests/features/decision-results.js",
+    "test:ui-responsiveness": "node tests/features/ui-responsiveness.js",
+    "test:features": "echo \"Running all feature tests...\" && npm run test:decision-creation && npm run test:criteria-management && npm run test:alternative-evaluation && npm run test:score-calculation && npm run test:decision-results && npm run test:ui-responsiveness",
+    "test:decision-creation-fixed": "node tests/features/decision-creation-fixed.js",
+    "test:all-fixed-features": "echo \"Running all fixed feature tests...\" && npm run test:all-fixed && npm run test:decision-creation-fixed && npm run test:criteria-management && npm run test:alternative-evaluation && npm run test:score-calculation && npm run test:decision-results && npm run test:ui-responsiveness"
   },
   "keywords": [
     "decision-matrix",
@@ -32,7 +54,11 @@
     "sequelize": "^6.37.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.0",
+    "jest": "^29.7.0",
+    "jest-puppeteer": "^11.0.0",
     "nodemon": "^3.0.3",
+    "puppeteer": "^24.4.0",
     "sqlite3": "^5.1.7"
   },
   "engines": {

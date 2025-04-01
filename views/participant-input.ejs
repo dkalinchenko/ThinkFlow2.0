@@ -1,0 +1,255 @@
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card mb-4">
+      <div class="card-header bg-primary text-white">
+        <h3 class="card-title mb-0">
+          <% if (collaborationType === 'criteria-weights') { %>
+            Provide Criteria Weights
+          <% } else if (collaborationType === 'alternatives-evaluation') { %>
+            Evaluate Alternatives
+          <% } %>
+          for "<%= decisionName %>"
+        </h3>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info mb-4">
+          <p class="mb-0">Welcome, <strong><%= participantName %></strong>! You've been invited to provide input for this decision.</p>
+        </div>
+        
+        <!-- Participant Name Input -->
+        <div class="mb-4">
+          <label for="participant-name" class="form-label">Your Name</label>
+          <input type="text" class="form-control" id="participant-name" value="<%= participantName %>" placeholder="Enter your name">
+          <div class="form-text">Please enter your name so the decision owner knows who contributed.</div>
+        </div>
+        
+        <% if (collaborationType === 'criteria-weights') { %>
+          <!-- Criteria Weights Form -->
+          <div id="criteria-weights-form">
+            <h4 class="mb-3">Assign Importance to Each Criterion</h4>
+            <p class="text-muted mb-4">Rate each criterion's importance as a percentage from 0% to 100%. Ideally, all weights should sum to 100%.</p>
+            
+            <div id="criteria-list">
+              <% criteria.forEach(function(criterion, index) { %>
+                <div class="mb-3">
+                  <label for="criterion-<%= index %>" class="form-label"><%= criterion %></label>
+                  <div class="d-flex align-items-center">
+                    <input type="range" class="form-range me-2" id="criterion-<%= index %>" name="criterion-<%= index %>" 
+                           min="0" max="100" value="<%= Math.round(Number(weights[criterion] || 100/criteria.length)) %>" 
+                           data-criterion="<%= criterion %>">
+                    <span class="badge bg-primary weight-value" style="min-width: 3rem; text-align: center;" 
+                          id="weight-value-<%= index %>"><%= Math.round(Number(weights[criterion] || 100/criteria.length)) %>%</span>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+            
+            <div class="alert alert-info total-weight-info mt-3">
+              <span id="total-weight-display">Total weight: 0%</span>
+              <div class="progress mt-2">
+                <div id="total-weight-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+              </div>
+            </div>
+            
+          </div>
+        <% } else if (collaborationType === 'alternatives-evaluation') { %>
+          <!-- Alternatives Evaluation Form -->
+          <div id="alternatives-evaluation-form">
+            <h4 class="mb-3">Rate Each Alternative</h4>
+            <p class="text-muted mb-4">For each criterion, rate how well each alternative performs from 1 (poor) to 10 (excellent).</p>
+            
+            <div id="evaluation-matrix">
+              <% criteria.forEach(function(criterion, criterionIndex) { %>
+                <div class="criterion-section mb-4">
+                  <h5><%= criterion %></h5>
+                  
+                  <% alternatives.forEach(function(alternative, alternativeIndex) { %>
+                    <div class="mb-3">
+                      <label for="rating-<%= criterionIndex %>-<%= alternativeIndex %>" class="form-label">
+                        <%= alternative %>
+                      </label>
+                      <div class="d-flex align-items-center">
+                        <input type="range" class="form-range me-2" 
+                               id="rating-<%= criterionIndex %>-<%= alternativeIndex %>" 
+                               name="rating-<%= criterionIndex %>-<%= alternativeIndex %>" 
+                               min="1" max="10" 
+                               value="<%= evaluations[alternative] && evaluations[alternative][criterion] ? evaluations[alternative][criterion] : 5 %>" 
+                               data-criterion="<%= criterion %>" 
+                               data-alternative="<%= alternative %>">
+                        <span class="badge bg-primary rating-value" style="min-width: 2rem; text-align: center;" 
+                              id="rating-value-<%= criterionIndex %>-<%= alternativeIndex %>">
+                          <%= evaluations[alternative] && evaluations[alternative][criterion] ? evaluations[alternative][criterion] : 5 %>
+                        </span>
+                      </div>
+                    </div>
+                  <% }); %>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+        <% } %>
+        
+        <div class="d-grid gap-2 mt-4">
+          <button type="button" class="btn btn-primary" id="submit-input-btn">
+            <i class="fas fa-check"></i> Submit Input
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Update range input values on change
+    const rangeInputs = document.querySelectorAll('input[type="range"]');
+    
+    // Function to update weight total for criteria weights
+    function updateWeightTotal() {
+      if ('<%= collaborationType %>' === 'criteria-weights') {
+        const criteriaInputs = document.querySelectorAll('#criteria-list input[type="range"]');
+        let totalWeight = 0;
+        
+        criteriaInputs.forEach(input => {
+          totalWeight += parseInt(input.value, 10);
+        });
+        
+        const totalWeightDisplay = document.getElementById('total-weight-display');
+        const totalWeightProgress = document.getElementById('total-weight-progress');
+        
+        if (totalWeightDisplay && totalWeightProgress) {
+          totalWeightDisplay.textContent = `Total weight: ${totalWeight}%`;
+          
+          // Update progress bar
+          const progressWidth = Math.min(totalWeight, 100);
+          totalWeightProgress.style.width = `${progressWidth}%`;
+          
+          // Set color based on how close to 100% we are
+          if (totalWeight === 100) {
+            totalWeightProgress.className = 'progress-bar bg-success';
+            totalWeightDisplay.className = 'text-success';
+          } else if (totalWeight > 90 && totalWeight < 110) {
+            totalWeightProgress.className = 'progress-bar bg-warning';
+            totalWeightDisplay.className = 'text-warning';
+          } else {
+            totalWeightProgress.className = 'progress-bar bg-danger';
+            totalWeightDisplay.className = 'text-danger';
+          }
+        }
+      }
+    }
+    
+    rangeInputs.forEach(input => {
+      const id = input.id;
+      const valueDisplay = document.getElementById(id.replace('criterion-', 'weight-value-').replace('rating-', 'rating-value-'));
+      
+      if (valueDisplay) {
+        input.addEventListener('input', function() {
+          if (id.startsWith('criterion-')) {
+            valueDisplay.textContent = this.value + '%';
+            updateWeightTotal();
+          } else {
+            valueDisplay.textContent = this.value;
+          }
+        });
+      }
+    });
+    
+    // Initialize weight total
+    updateWeightTotal();
+    
+    // Handle submit button
+    document.getElementById('submit-input-btn').addEventListener('click', function() {
+      submitParticipantInput();
+    });
+  });
+  
+  function submitParticipantInput() {
+    const collaborationType = '<%= collaborationType %>';
+    let inputData = {
+      participantId: '<%= participantId %>',
+      decisionId: '<%= decisionId %>',
+      collaborationType: collaborationType,
+      participantName: document.getElementById('participant-name').value.trim() || '<%= participantName %>'
+    };
+    
+    if (collaborationType === 'criteria-weights') {
+      // Collect criteria weights
+      const weights = {};
+      const criteriaInputs = document.querySelectorAll('#criteria-list input[type="range"]');
+      let totalWeight = 0;
+      
+      criteriaInputs.forEach(input => {
+        const criterion = input.dataset.criterion;
+        const weight = parseInt(input.value, 10);
+        weights[criterion] = weight;
+        totalWeight += weight;
+      });
+      
+      // Optional: normalize weights to ensure they sum to 100%
+      if (totalWeight !== 100 && totalWeight > 0) {
+        const criteriaCount = criteriaInputs.length;
+        
+        // Ask for confirmation if weights don't sum to 100%
+        if (!confirm(`Your weights sum to ${totalWeight}% instead of 100%. Would you like to normalize them to sum to 100%?`)) {
+          return; // User cancelled
+        }
+        
+        // Normalize weights
+        criteriaInputs.forEach(input => {
+          const criterion = input.dataset.criterion;
+          weights[criterion] = (weights[criterion] / totalWeight) * 100;
+        });
+      }
+      
+      inputData.weights = weights;
+    } else if (collaborationType === 'alternatives-evaluation') {
+      // Collect alternative evaluations
+      const evaluations = {};
+      const ratingInputs = document.querySelectorAll('#evaluation-matrix input[type="range"]');
+      
+      ratingInputs.forEach(input => {
+        const criterion = input.dataset.criterion;
+        const alternative = input.dataset.alternative;
+        
+        if (!evaluations[criterion]) {
+          evaluations[criterion] = {};
+        }
+        
+        evaluations[criterion][alternative] = parseInt(input.value, 10);
+      });
+      
+      inputData.evaluations = evaluations;
+    }
+    
+    // Send the input data to the server
+    fetch('/submit-participant-input', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(inputData)
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showToast('Input submitted successfully!', 'success');
+        // Show thank you message
+        document.querySelector('.card-body').innerHTML = `
+          <div class="text-center py-5">
+            <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
+            <h3 class="mt-4">Thank You!</h3>
+            <p class="lead">Your input has been recorded successfully.</p>
+            <p>The decision owner will be notified of your contribution.</p>
+          </div>
+        `;
+      } else {
+        showToast(data.error || 'Failed to submit input', 'error');
+      }
+    })
+    .catch(error => {
+      console.error('Error submitting input:', error);
+      showToast('Error submitting input', 'error');
+    });
+  }
+</script> 

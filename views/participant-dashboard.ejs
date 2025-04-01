@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/all.min.css">
+  <link rel="stylesheet" href="/css/styles.css">
+  <!-- Chart.js for data visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Add a color palette for better visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-colorschemes"></script>
+</head>
+<body>
+  <!-- Simple navigation bar instead of the missing navbar partial -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="/">ThinkFlow</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/"><i class="fas fa-home"></i> Home</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  
+  <!-- Hidden element for dashboard data -->
+  <script id="dashboard-data" type="application/json"><%- dashboardData %></script>
+  
+  <div class="container mt-5 mb-5">
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card mb-4">
+          <div class="card-header bg-primary text-white">
+            <div class="d-flex justify-content-between align-items-center">
+              <h2 class="mb-0">Participant Comparison Dashboard</h2>
+              <a href="/decision/<%= JSON.parse(dashboardData).decision.id %>" class="btn btn-light">
+                <i class="fas fa-arrow-left me-1"></i> Back to Decision
+              </a>
+            </div>
+          </div>
+          
+          <div class="card-body">
+            <div class="alert alert-info mb-4">
+              <p class="mb-0">
+                <i class="fas fa-info-circle me-2"></i>
+                This dashboard shows how different participants contributed to your decision. 
+                Compare criteria weights and alternative evaluations across all participants.
+              </p>
+            </div>
+            
+            <!-- Dashboard Stats Overview -->
+            <div class="row mb-4">
+              <div class="col-md-4">
+                <div class="card bg-light">
+                  <div class="card-body text-center">
+                    <h5>Decision</h5>
+                    <h3 id="decision-name"></h3>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="card bg-light">
+                  <div class="card-body text-center">
+                    <h5>Weight Contributors</h5>
+                    <h3 id="weight-contributors-count">0</h3>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="card bg-light">
+                  <div class="card-body text-center">
+                    <h5>Evaluation Contributors</h5>
+                    <h3 id="eval-contributors-count">0</h3>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Criteria Weights Comparison -->
+            <div class="card mb-4">
+              <div class="card-header bg-light">
+                <h4 class="mb-0">Criteria Weights Comparison</h4>
+              </div>
+              <div class="card-body">
+                <div id="criteria-weights-container">
+                  <div class="row">
+                    <div class="col-md-7">
+                      <!-- Chart for comparing weights across participants -->
+                      <canvas id="weights-comparison-chart" height="300"></canvas>
+                    </div>
+                    <div class="col-md-5">
+                      <!-- Table showing the raw data -->
+                      <div class="table-responsive">
+                        <table class="table table-sm table-bordered" id="weights-comparison-table">
+                          <thead>
+                            <tr>
+                              <th>Contributor</th>
+                              <!-- Criteria headers will be added dynamically -->
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <!-- Participant data rows will be added dynamically -->
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div id="no-weights-data" class="alert alert-warning d-none">
+                  <i class="fas fa-exclamation-triangle me-2"></i>
+                  No participant weight data available yet.
+                </div>
+              </div>
+            </div>
+            
+            <!-- Alternative Evaluations Comparison -->
+            <div class="card mb-4">
+              <div class="card-header bg-light">
+                <h4 class="mb-0">Alternative Evaluations Comparison</h4>
+              </div>
+              <div class="card-body">
+                <div id="alternative-evals-container">
+                  <!-- Tabs for each criterion -->
+                  <ul class="nav nav-tabs mb-3" id="criterion-tabs" role="tablist">
+                    <!-- Criterion tabs will be added dynamically -->
+                  </ul>
+                  
+                  <!-- Tab content -->
+                  <div class="tab-content" id="criterion-tab-content">
+                    <!-- Tab panes will be added dynamically -->
+                  </div>
+                </div>
+                <div id="no-evals-data" class="alert alert-warning d-none">
+                  <i class="fas fa-exclamation-triangle me-2"></i>
+                  No participant evaluation data available yet.
+                </div>
+              </div>
+            </div>
+            
+            <!-- Overall Impact Analysis -->
+            <div class="card mb-4">
+              <div class="card-header bg-light">
+                <h4 class="mb-0">Overall Impact Analysis</h4>
+              </div>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <h5 class="text-center mb-3">Final Scores Comparison</h5>
+                    <canvas id="final-scores-chart" height="300"></canvas>
+                  </div>
+                  <div class="col-md-6">
+                    <h5 class="text-center mb-3">Participant Influence</h5>
+                    <canvas id="influence-chart" height="300"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Decision Matrix Comparison -->
+            <div class="card mb-5">
+              <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Decision Matrix Comparison</h4>
+              </div>
+              <div class="card-body">
+                <div class="alert alert-info mb-4">
+                  <p class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    This table shows the complete decision matrix with criteria weights and alternative evaluations.
+                    Compare the average values with individual participant evaluations using the tabs below.
+                  </p>
+                </div>
+                
+                <!-- Matrix Tabs Navigation -->
+                <ul class="nav nav-tabs mb-4" id="matrixTabs" role="tablist">
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="average-tab" data-bs-toggle="tab" data-bs-target="#average-matrix" 
+                           type="button" role="tab" aria-controls="average-matrix" aria-selected="true">
+                      Average (All Participants)
+                    </button>
+                  </li>
+                  <div id="participant-matrix-tabs"></div>
+                </ul>
+                
+                <!-- Matrix Tabs Content -->
+                <div class="tab-content" id="matrixTabContent">
+                  <!-- Average Matrix Tab -->
+                  <div class="tab-pane fade show active" id="average-matrix" role="tabpanel" aria-labelledby="average-tab">
+                    <div class="table-responsive">
+                      <table class="table table-bordered matrix-table">
+                        <thead>
+                          <tr class="bg-light">
+                            <th style="width: 200px;"></th>
+                            <th class="text-center weights-row" colspan="100%" id="average-weights-header">Criteria Weights</th>
+                          </tr>
+                          <tr>
+                            <th class="bg-light">Alternatives</th>
+                            <th class="text-center criteria-header" id="average-criteria-headers"></th>
+                          </tr>
+                        </thead>
+                        <tbody id="average-matrix-body">
+                          <!-- Will be populated via JavaScript -->
+                        </tbody>
+                        <tfoot>
+                          <tr class="bg-light">
+                            <th>Final Scores</th>
+                            <th colspan="100%" class="text-end" id="average-final-scores"></th>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                  
+                  <!-- Individual participant matrix tabs will be added here dynamically -->
+                  <div id="participant-matrix-content"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/main.js"></script>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        console.log('Dashboard data received');
+        
+        // Parse the dashboard data carefully
+        let dashboardData;
+        try {
+          // Use the pre-escaped JSON data provided by the server
+          dashboardData = JSON.parse("<%= dashboardDataJSON %>");
+          console.log('Successfully parsed dashboard data');
+        } catch (parseError) {
+          console.error('Error parsing dashboard data:', parseError);
+          // Try alternate parsing method
+          try {
+            const dataElement = document.getElementById('dashboard-data');
+            if (dataElement) {
+              dashboardData = JSON.parse(dataElement.textContent);
+              console.log('Successfully parsed dashboard data from data element');
+            } else {
+              throw new Error('No data element found');
+            }
+          } catch (alternateError) {
+            console.error('Error with alternate parsing method:', alternateError);
+            throw new Error('Failed to parse dashboard data: ' + parseError.message);
+          }
+        }
+        
+        if (!dashboardData || !dashboardData.decision) {
+          throw new Error('Dashboard data is missing or invalid');
+        }
+        
+        const decision = dashboardData.decision;
+        const weightParticipants = dashboardData.weightParticipants || [];
+        const evalParticipants = dashboardData.evalParticipants || [];
+        
+        console.log('Decision:', {
+          id: decision.id,
+          name: decision.name,
+          criteriaCount: decision.criteria?.length || 0,
+          alternativesCount: decision.alternatives?.length || 0,
+          weightParticipantCount: weightParticipants.length,
+          evalParticipantCount: evalParticipants.length
+        });
+        
+        // Set basic dashboard information
+        document.getElementById('decision-name').textContent = decision.name || 'Unnamed Decision';
+        document.getElementById('weight-contributors-count').textContent = weightParticipants.length;
+        document.getElementById('eval-contributors-count').textContent = evalParticipants.length;
+        
+        // Handle criteria weights visualization
+        if (weightParticipants.length > 0 && decision.criteria && decision.criteria.length > 0) {
+          renderWeightsComparison(decision, weightParticipants);
+        } else {
+          document.getElementById('criteria-weights-container').classList.add('d-none');
+          document.getElementById('no-weights-data').classList.remove('d-none');
+        }
+        
+        // Handle alternative evaluations visualization
+        if (evalParticipants.length > 0 && decision.criteria && decision.criteria.length > 0 && 
+            decision.alternatives && decision.alternatives.length > 0) {
+          renderEvaluationsComparison(decision, evalParticipants);
+        } else {
+          document.getElementById('alternative-evals-container').classList.add('d-none');
+          document.getElementById('no-evals-data').classList.remove('d-none');
+        }
+        
+        // Render overall impact analysis
+        if ((weightParticipants.length > 0 || evalParticipants.length > 0) && 
+            decision.alternatives && decision.alternatives.length > 0 && 
+            decision.results) {
+          renderOverallImpactAnalysis(decision, weightParticipants, evalParticipants);
+        }
+        
+        // Render decision matrix with tabs
+        renderDecisionMatrix(decision, weightParticipants, evalParticipants);
+      } catch (error) {
+        console.error('Error initializing dashboard:', error);
+        document.querySelector('.container').innerHTML = `
+          <div class="alert alert-danger mt-4">
+            <h4><i class="fas fa-exclamation-triangle"></i> Error Loading Dashboard</h4>
+            <p>There was a problem loading the participant dashboard data. Error details:</p>
+            <pre class="bg-light p-3 mt-2">${error.message}</pre>
+            <div class="mt-3">
+              <a href="javascript:history.back()" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Go Back
+              </a>
+              <a href="/" class="btn btn-primary">
+                <i class="fas fa-home"></i> Home
+              </a>
+            </div>
+          </div>
+        `;
+      }
+    });
+    
+    // Function to render weights comparison visualization
+    function renderWeightsComparison(decision, weightParticipants) {
+      try {
+        console.log('Rendering weights comparison with:', { 
+          criteriaCount: decision.criteria?.length, 
+          participantCount: weightParticipants?.length
+        });
+        
+        const criteria = decision.criteria || [];
+        if (!criteria.length) {
+          throw new Error('No criteria available for rendering weights comparison');
+        }
+        
+        // Prepare table data
+        const tableHeader = document.querySelector('#weights-comparison-table thead tr');
+        const tableBody = document.querySelector('#weights-comparison-table tbody');
+        
+        if (!tableHeader || !tableBody) {
+          throw new Error('Required table elements not found in the DOM');
+        }
+        
+        // Clear existing content
+        while (tableHeader.children.length > 1) {
+          tableHeader.removeChild(tableHeader.lastChild);
+        }
+        tableBody.innerHTML = '';
+        
+        // Add participant columns to header
+        weightParticipants.forEach(participant => {
+          const th = document.createElement('th');
+          th.textContent = participant.name || 'Anonymous';
+          tableHeader.appendChild(th);
+        });
+        
+        // Add average column
+        const avgTh = document.createElement('th');
+        avgTh.textContent = 'Average';
+        avgTh.classList.add('bg-light');
+        tableHeader.appendChild(avgTh);
+        
+        // Calculate and populate rows
+        criteria.forEach(criterion => {
+          const tr = document.createElement('tr');
+          
+          // Criterion name cell
+          const td = document.createElement('td');
+          td.textContent = criterion;
+          td.classList.add('fw-bold');
+          tr.appendChild(td);
+          
+          // Participant weight cells
+          const weights = [];
+          weightParticipants.forEach(participant => {
+            const weight = participant.data?.[criterion] || 0;
+            weights.push(weight);
+            
+            const weightTd = document.createElement('td');
+            weightTd.textContent = `${weight}%`;
+            tr.appendChild(weightTd);
+          });
+          
+          // Average weight cell
+          const avgWeight = weights.length > 0 ? weights.reduce((a, b) => a + b, 0) / weights.length : 0;
+          const avgTd = document.createElement('td');
+          avgTd.textContent = `${avgWeight.toFixed(1)}%`;
+          avgTd.classList.add('bg-light');
+          tr.appendChild(avgTd);
+          
+          tableBody.appendChild(tr);
+        });
+        
+        // Render the radar chart
+        renderWeightsRadarChart(decision, weightParticipants);
+      } catch (error) {
+        console.error('Error in renderWeightsComparison:', error);
+        const container = document.getElementById('criteria-weights-container');
+        if (container) {
+          container.innerHTML = `
+            <div class="alert alert-danger">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              Error rendering weights comparison: ${error.message}
+            </div>
+          `;
+        }
+      }
+    }
+    
+    // Function to render the weights radar chart
+    function renderWeightsRadarChart(decision, weightParticipants) {
+      try {
+        console.log('Rendering weights radar chart');
+        const criteria = decision.criteria || [];
+        if (!criteria.length) {
+          throw new Error('No criteria available for radar chart');
+        }
+        
+        const ctx = document.getElementById('weights-comparison-chart');
+        if (!ctx) {
+          throw new Error('Chart canvas element not found');
+        }
+        
+        // Prepare datasets
+        const datasets = [];
+        
+        // Add owner's dataset
+        datasets.push({
+          label: 'Decision Owner',
+          data: criteria.map(criterion => Number(decision.weights?.[criterion] || 0)),
+          fill: true,
+          backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          borderColor: 'rgb(255, 99, 132)',
+          pointBackgroundColor: 'rgb(255, 99, 132)',
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: 'rgb(255, 99, 132)'
+        });
+        
+        // Add participant datasets
+        weightParticipants.forEach((participant, index) => {
+          const colors = [
+            { bg: 'rgba(54, 162, 235, 0.2)', border: 'rgb(54, 162, 235)' },
+            { bg: 'rgba(255, 206, 86, 0.2)', border: 'rgb(255, 206, 86)' },
+            { bg: 'rgba(75, 192, 192, 0.2)', border: 'rgb(75, 192, 192)' },
+            { bg: 'rgba(153, 102, 255, 0.2)', border: 'rgb(153, 102, 255)' }
+          ];
+          const colorIndex = index % colors.length;
+          
+          datasets.push({
+            label: participant.name || 'Anonymous',
+            data: criteria.map(criterion => Number(participant.data?.[criterion] || 0)),
+            fill: true,
+            backgroundColor: colors[colorIndex].bg,
+            borderColor: colors[colorIndex].border,
+            pointBackgroundColor: colors[colorIndex].border,
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: colors[colorIndex].border
+          });
+        });
+        
+        // Create the chart
+        new Chart(ctx, {
+          type: 'radar',
+          data: {
+            labels: criteria,
+            datasets: datasets
+          },
+          options: {
+            elements: {
+              line: {
+                borderWidth: 3
+              }
+            },
+            plugins: {
+              title: {
+                display: true,
+                text: 'Criteria Weight Distribution (% Importance)'
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error in renderWeightsRadarChart:', error);
+        const container = document.getElementById('weights-comparison-chart').parentNode;
+        if (container) {
+          container.innerHTML = `
+            <div class="alert alert-danger">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              Error rendering radar chart: ${error.message}
+            </div>
+          `;
+        }
+      }
+    }
+    
+    // Function to render evaluations comparison
+    function renderEvaluationsComparison(decision, evalParticipants) {
+      try {
+        console.log('Rendering evaluations comparison');
+        const criteria = decision.criteria || [];
+        const alternatives = decision.alternatives || [];
+        
+        if (!criteria.length || !alternatives.length) {
+          throw new Error('No criteria or alternatives available for comparison');
+        }
+        
+        const tabsContainer = document.getElementById('criterion-tabs');
+        const tabContent = document.getElementById('criterion-tab-content');
+        
+        if (!tabsContainer || !tabContent) {
+          throw new Error('Required DOM elements not found');
+        }
+        
+        // Clear existing content
+        tabsContainer.innerHTML = '';
+        tabContent.innerHTML = '';
+        
+        // Create tabs and content for each criterion
+        criteria.forEach((criterion, index) => {
+          // Create tab
+          const tabLi = document.createElement('li');
+          tabLi.className = 'nav-item';
+          tabLi.role = 'presentation';
+          
+          const tabButton = document.createElement('button');
+          tabButton.className = `nav-link ${index === 0 ? 'active' : ''}`;
+          tabButton.id = `${criterion}-tab`;
+          tabButton.setAttribute('data-bs-toggle', 'tab');
+          tabButton.setAttribute('data-bs-target', `#${criterion}-pane`);
+          tabButton.type = 'button';
+          tabButton.role = 'tab';
+          tabButton.setAttribute('aria-controls', `${criterion}-pane`);
+          tabButton.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
+          tabButton.textContent = criterion;
+          
+          tabLi.appendChild(tabButton);
+          tabsContainer.appendChild(tabLi);
+          
+          // Create tab pane
+          const tabPane = document.createElement('div');
+          tabPane.className = `tab-pane fade ${index === 0 ? 'show active' : ''}`;
+          tabPane.id = `${criterion}-pane`;
+          tabPane.role = 'tabpanel';
+          tabPane.setAttribute('aria-labelledby', `${criterion}-tab`);
+          
+          // Create chart and table containers
+          const row = document.createElement('div');
+          row.className = 'row mt-3';
+          
+          const chartCol = document.createElement('div');
+          chartCol.className = 'col-md-7';
+          const chartCanvas = document.createElement('canvas');
+          chartCanvas.id = `chart-${criterion}`;
+          chartCanvas.height = 300;
+          chartCol.appendChild(chartCanvas);
+          
+          const tableCol = document.createElement('div');
+          tableCol.className = 'col-md-5';
+          const table = document.createElement('table');
+          table.className = 'table table-sm table-bordered';
+          
+          // Create table header
+          const thead = document.createElement('thead');
+          const headerRow = document.createElement('tr');
+          const alternativeHeader = document.createElement('th');
+          alternativeHeader.textContent = 'Alternative';
+          headerRow.appendChild(alternativeHeader);
+          
+          // Add participant headers
+          evalParticipants.forEach(participant => {
+            const th = document.createElement('th');
+            th.textContent = participant.name || 'Anonymous';
+            headerRow.appendChild(th);
+          });
+          
+          // Add owner and average headers
+          const ownerHeader = document.createElement('th');
+          ownerHeader.textContent = 'Owner';
+          headerRow.appendChild(ownerHeader);
+          
+          const avgHeader = document.createElement('th');
+          avgHeader.textContent = 'Average';
+          avgHeader.className = 'bg-light';
+          headerRow.appendChild(avgHeader);
+          
+          thead.appendChild(headerRow);
+          table.appendChild(thead);
+          
+          // Create table body
+          const tbody = document.createElement('tbody');
+          
+          // Populate table with evaluation data
+          alternatives.forEach(alternative => {
+            const tr = document.createElement('tr');
+            
+            // Alternative name cell
+            const altCell = document.createElement('td');
+            altCell.textContent = alternative;
+            altCell.className = 'fw-bold';
+            tr.appendChild(altCell);
+            
+            // Calculate participant scores and average
+            let totalScore = 0;
+            let count = 0;
+            
+            // Add participant scores
+            evalParticipants.forEach(participant => {
+              let score = 0;
+              try {
+                // Try to access the score in different ways
+                if (participant.data && participant.data[criterion]) {
+                  score = Number(participant.data[criterion][alternative] || 0);
+                }
+              } catch (e) {
+                console.warn(`Error accessing score for ${alternative} in ${criterion}:`, e);
+              }
+              
+              totalScore += score;
+              count++;
+              
+              const scoreCell = document.createElement('td');
+              scoreCell.textContent = score.toFixed(1);
+              tr.appendChild(scoreCell);
+            });
+            
+            // Add owner score
+            let ownerScore = 0;
+            try {
+              if (decision.evaluations && decision.evaluations[alternative]) {
+                ownerScore = Number(decision.evaluations[alternative][criterion] || 0);
+              }
+            } catch (e) {
+              console.warn(`Error accessing owner score:`, e);
+            }
+            
+            totalScore += ownerScore;
+            count++;
+            
+            const ownerCell = document.createElement('td');
+            ownerCell.textContent = ownerScore.toFixed(1);
+            tr.appendChild(ownerCell);
+            
+            // Add average score
+            const average = count > 0 ? totalScore / count : 0;
+            const avgCell = document.createElement('td');
+            avgCell.textContent = average.toFixed(1);
+            avgCell.className = 'bg-light';
+            tr.appendChild(avgCell);
+            
+            tbody.appendChild(tr);
+          });
+          
+          table.appendChild(tbody);
+          tableCol.appendChild(table);
+          
+          row.appendChild(chartCol);
+          row.appendChild(tableCol);
+          tabPane.appendChild(row);
+          
+          tabContent.appendChild(tabPane);
+          
+          // Render chart for this criterion
+          setTimeout(() => {
+            renderEvaluationChart(criterion, decision, evalParticipants);
+          }, 100);
+        });
+      } catch (error) {
+        console.error('Error in renderEvaluationsComparison:', error);
+        const container = document.getElementById('alternative-evals-container');
+        if (container) {
+          container.innerHTML = `
+            <div class="alert alert-danger">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              Error rendering evaluations comparison: ${error.message}
+            </div>
+          `;
+        }
+      }
+    }
+    
+    // Function to render the evaluation chart for a specific criterion
+    function renderEvaluationChart(criterion, decision, evalParticipants) {
+      try {
+        console.log(`Rendering evaluation chart for criterion: ${criterion}`);
+        const alternatives = decision.alternatives || [];
+        if (!alternatives.length) {
+          throw new Error('No alternatives available for chart');
+        }
+        
+        const ctx = document.getElementById(`chart-${criterion}`);
+        if (!ctx) {
+          throw new Error(`Canvas element for criterion ${criterion} not found`);
+        }
+        
+        // Prepare data for chart
+        const datasets = [{
+          label: 'Decision Owner',
+          data: alternatives.map(alt => {
+            try {
+              return Number(decision.evaluations?.[alt]?.[criterion] || 0);
+            } catch (e) {
+              console.warn(`Error accessing owner evaluation for ${alt}:`, e);
+              return 0;
+            }
+          }),
+          backgroundColor: 'rgba(255, 99, 132, 0.7)',
+          borderColor: 'rgb(255, 99, 132)',
+          borderWidth: 2
+        }];
+        
+        // Add participant datasets
+        evalParticipants.forEach((participant, index) => {
+          const colors = [
+            { bg: 'rgba(54, 162, 235, 0.7)', border: 'rgb(54, 162, 235)' },
+            { bg: 'rgba(255, 206, 86, 0.7)', border: 'rgb(255, 206, 86)' },
+            { bg: 'rgba(75, 192, 192, 0.7)', border: 'rgb(75, 192, 192)' },
+            { bg: 'rgba(153, 102, 255, 0.7)', border: 'rgb(153, 102, 255)' }
+          ];
+          const colorIndex = index % colors.length;
+          
+          datasets.push({
+            label: participant.name || 'Anonymous',
+            data: alternatives.map(alt => {
+              try {
+                return Number(participant.data?.[criterion]?.[alt] || 0);
+              } catch (e) {
+                console.warn(`Error accessing participant evaluation for ${alt}:`, e);
+                return 0;
+              }
+            }),
+            backgroundColor: colors[colorIndex].bg,
+            borderColor: colors[colorIndex].border,
+            borderWidth: 2
+          });
+        });
+        
+        // Create chart
+        new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: alternatives,
+            datasets: datasets
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 10
+              }
+            },
+            plugins: {
+              title: {
+                display: true,
+                text: `Ratings for criterion: ${criterion} (Scale: 1-10)`
+              },
+              legend: {
+                position: 'bottom'
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.error(`Error in renderEvaluationChart for ${criterion}:`, error);
+        const canvas = document.getElementById(`chart-${criterion}`);
+        if (canvas && canvas.parentNode) {
+          canvas.parentNode.innerHTML = `
+            <div class="alert alert-warning">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              Error rendering chart: ${error.message}
+            </div>
+          `;
+        }
+      }
+    }
+    
+    // Function to render overall impact analysis
+    function renderOverallImpactAnalysis(decision, weightParticipants, evalParticipants) {
+      // Render final scores comparison
+      renderFinalScoresChart(decision);
+      
+      // Render influence chart 
+      renderInfluenceChart(decision, weightParticipants, evalParticipants);
+    }
+    
+    // Function to render final scores comparison
+    function renderFinalScoresChart(decision) {
+      const alternatives = decision.alternatives;
+      const ctx = document.getElementById('final-scores-chart').getContext('2d');
+      
+      // Extract final scores
+      const scores = [];
+      alternatives.forEach(alt => {
+        let score = 0;
+        if (decision.results[alt]) {
+          // Handle different result formats
+          if (typeof decision.results[alt] === 'object') {
+            score = decision.results[alt].score || 0;
+          } else {
+            score = decision.results[alt] || 0;
+          }
+        }
+        scores.push(score);
+      });
+      
+      // Create the chart
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: alternatives,
+          datasets: [{
+            label: 'Final Score (with participant input)',
+            data: scores,
+            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 10
+            }
+          },
+          plugins: {
+            title: {
+              display: true,
+              text: 'Final Alternative Scores (Scale: 1-10)'
+            }
+          }
+        }
+      });
+    }
+    
+    // Function to render participant influence chart
+    function renderInfluenceChart(decision, weightParticipants, evalParticipants) {
+      const ctx = document.getElementById('influence-chart').getContext('2d');
+      
+      // Calculate influence values
+      const ownerWeight = 1; // base weight for the owner
+      
+      // Get total participant counts
+      const weightCount = weightParticipants.length;
+      const evalCount = evalParticipants.length;
+      
+      // Calculate influence percentages
+      const totalContributors = 1 + weightCount + evalCount; // owner + weight participants + eval participants
+      const ownerInfluence = (ownerWeight / totalContributors) * 100;
+      const weightInfluence = (weightCount / totalContributors) * 100;
+      const evalInfluence = (evalCount / totalContributors) * 100;
+      
+      // Create the chart
+      new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: ['Decision Owner', 'Weight Contributors', 'Evaluation Contributors'],
+          datasets: [{
+            data: [ownerInfluence, weightInfluence, evalInfluence],
+            backgroundColor: [
+              'rgba(255, 99, 132, 0.7)',
+              'rgba(54, 162, 235, 0.7)',
+              'rgba(255, 206, 86, 0.7)'
+            ],
+            borderColor: [
+              'rgba(255, 99, 132, 1)',
+              'rgba(54, 162, 235, 1)',
+              'rgba(255, 206, 86, 1)'
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          plugins: {
+            title: {
+              display: true,
+              text: 'Contribution Influence Distribution'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label;
+                  const value = context.raw.toFixed(1) + '%';
+                  return `${label}: ${value}`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    // Function to render the decision matrix table
+    function renderDecisionMatrix(decision, weightParticipants, evalParticipants) {
+      try {
+        console.log('Rendering decision matrix');
+        
+        // Get required data
+        const criteria = decision.criteria || [];
+        const alternatives = decision.alternatives || [];
+        const weights = decision.weights || {};
+        const evaluations = decision.evaluations || {};
+        const results = decision.results || {};
+        
+        if (criteria.length === 0 || alternatives.length === 0) {
+          console.warn('No criteria or alternatives to display');
+          return;
+        }
+        
+        // Render Average Matrix (Default Tab)
+        renderAverageMatrix(criteria, alternatives, weights, evaluations, results);
+        
+        // Render Individual Participant Matrices
+        renderParticipantMatrices(decision, weightParticipants, evalParticipants);
+        
+      } catch (error) {
+        console.error('Error rendering decision matrix', error);
+        document.querySelector('.matrix-table').innerHTML = `
+          <div class="alert alert-danger">
+            <p>Error rendering decision matrix: ${error.message}</p>
+          </div>
+        `;
+      }
+    }
+    
+    // Function to render the average matrix (all participants)
+    function renderAverageMatrix(criteria, alternatives, weights, evaluations, results) {
+      // Render criteria headers with weights
+      let weightsHeader = '';
+      let criteriaHeader = '';
+      
+      criteria.forEach(criterion => {
+        const weight = weights[criterion] || 0;
+        weightsHeader += `<th class="text-center">${weight}%</th>`;
+        criteriaHeader += `<th class="text-center">${criterion}</th>`;
+      });
+      
+      document.getElementById('average-weights-header').innerHTML = 'Criteria Weights';
+      document.getElementById('average-criteria-headers').innerHTML = criteriaHeader;
+      
+      // Render alternatives and their evaluations
+      let matrixBody = '';
+      
+      alternatives.forEach(alternative => {
+        let row = `<tr><th class="bg-light">${alternative}</th>`;
+        
+        criteria.forEach(criterion => {
+          const score = evaluations[alternative] && evaluations[alternative][criterion] 
+            ? evaluations[alternative][criterion] 
+            : '-';
+          row += `<td class="text-center">${score}</td>`;
+        });
+        
+        row += '</tr>';
+        matrixBody += row;
+      });
+      
+      document.getElementById('average-matrix-body').innerHTML = matrixBody;
+      
+      // Render final scores
+      let finalScoresHtml = '';
+      alternatives.forEach(alternative => {
+        const score = results[alternative] ? results[alternative].toFixed(2) : '-';
+        finalScoresHtml += `<span class="badge bg-primary me-2">${alternative}: ${score}</span>`;
+      });
+      
+      document.getElementById('average-final-scores').innerHTML = finalScoresHtml;
+    }
+    
+    // Function to render individual participant matrices
+    function renderParticipantMatrices(decision, weightParticipants, evalParticipants) {
+      const criteria = decision.criteria || [];
+      const alternatives = decision.alternatives || [];
+      const tabsContainer = document.getElementById('participant-matrix-tabs');
+      const contentContainer = document.getElementById('participant-matrix-content');
+      
+      // Clear existing tabs and content
+      tabsContainer.innerHTML = '';
+      contentContainer.innerHTML = '';
+      
+      // Add tabs and content for weight participants
+      weightParticipants.forEach((participant, index) => {
+        if (!participant.completed) return;
+        
+        const participantId = participant.id;
+        const participantName = participant.name || `Participant ${index + 1}`;
+        const tabId = `${participantId}-tab`;
+        const contentId = `${participantId}-matrix`;
+        
+        // Create tab
+        const tab = document.createElement('li');
+        tab.className = 'nav-item';
+        tab.role = 'presentation';
+        tab.innerHTML = `
+          <button class="nav-link" id="${tabId}" data-bs-toggle="tab" 
+                 data-bs-target="#${contentId}" type="button" role="tab" 
+                 aria-controls="${contentId}" aria-selected="false">
+            ${participantName} (Weights)
+          </button>
+        `;
+        tabsContainer.appendChild(tab);
+        
+        // Create content
+        const content = document.createElement('div');
+        content.className = 'tab-pane fade';
+        content.id = contentId;
+        content.role = 'tabpanel';
+        content.setAttribute('aria-labelledby', tabId);
+        
+        let weightsHeader = '';
+        let criteriaHeader = '';
+        
+        criteria.forEach(criterion => {
+          const weight = participant.data && participant.data[criterion] 
+            ? participant.data[criterion] 
+            : '-';
+          weightsHeader += `<th class="text-center">${weight}%</th>`;
+          criteriaHeader += `<th class="text-center">${criterion}</th>`;
+        });
+        
+        let matrixBody = '';
+        alternatives.forEach(alternative => {
+          let row = `<tr><th class="bg-light">${alternative}</th>`;
+          
+          criteria.forEach(criterion => {
+            const score = decision.evaluations && decision.evaluations[alternative] && decision.evaluations[alternative][criterion] 
+              ? decision.evaluations[alternative][criterion] 
+              : '-';
+            row += `<td class="text-center">${score}</td>`;
+          });
+          
+          row += '</tr>';
+          matrixBody += row;
+        });
+        
+        content.innerHTML = `
+          <div class="table-responsive">
+            <table class="table table-bordered matrix-table">
+              <thead>
+                <tr class="bg-light">
+                  <th style="width: 200px;"></th>
+                  <th class="text-center weights-row" colspan="${criteria.length}">
+                    ${participantName}'s Criteria Weights
+                  </th>
+                </tr>
+                <tr>
+                  <th class="bg-light">Alternatives</th>
+                  ${criteriaHeader}
+                </tr>
+              </thead>
+              <tbody>
+                ${matrixBody}
+              </tbody>
+            </table>
+          </div>
+          <div class="alert alert-info mt-3">
+            <small><i class="fas fa-info-circle me-1"></i> 
+            This view shows ${participantName}'s weights with average evaluations.</small>
+          </div>
+        `;
+        
+        contentContainer.appendChild(content);
+      });
+      
+      // Add tabs and content for evaluation participants
+      evalParticipants.forEach((participant, index) => {
+        if (!participant.completed) return;
+        
+        const participantId = participant.id;
+        const participantName = participant.name || `Participant ${index + 1}`;
+        const tabId = `${participantId}-eval-tab`;
+        const contentId = `${participantId}-eval-matrix`;
+        
+        // Create tab
+        const tab = document.createElement('li');
+        tab.className = 'nav-item';
+        tab.role = 'presentation';
+        tab.innerHTML = `
+          <button class="nav-link" id="${tabId}" data-bs-toggle="tab" 
+                 data-bs-target="#${contentId}" type="button" role="tab" 
+                 aria-controls="${contentId}" aria-selected="false">
+            ${participantName} (Evaluations)
+          </button>
+        `;
+        tabsContainer.appendChild(tab);
+        
+        // Create content
+        const content = document.createElement('div');
+        content.className = 'tab-pane fade';
+        content.id = contentId;
+        content.role = 'tabpanel';
+        content.setAttribute('aria-labelledby', tabId);
+        
+        let weightsHeader = '';
+        let criteriaHeader = '';
+        
+        criteria.forEach(criterion => {
+          const weight = decision.weights && decision.weights[criterion] 
+            ? decision.weights[criterion] 
+            : '-';
+          weightsHeader += `<th class="text-center">${weight}%</th>`;
+          criteriaHeader += `<th class="text-center">${criterion}</th>`;
+        });
+        
+        let matrixBody = '';
+        alternatives.forEach(alternative => {
+          let row = `<tr><th class="bg-light">${alternative}</th>`;
+          
+          criteria.forEach(criterion => {
+            const score = participant.data && participant.data[alternative] && participant.data[alternative][criterion] 
+              ? participant.data[alternative][criterion] 
+              : '-';
+            row += `<td class="text-center">${score}</td>`;
+          });
+          
+          row += '</tr>';
+          matrixBody += row;
+        });
+        
+        content.innerHTML = `
+          <div class="table-responsive">
+            <table class="table table-bordered matrix-table">
+              <thead>
+                <tr class="bg-light">
+                  <th style="width: 200px;"></th>
+                  <th class="text-center weights-row" colspan="${criteria.length}">
+                    Average Criteria Weights
+                  </th>
+                </tr>
+                <tr>
+                  <th class="bg-light">Alternatives</th>
+                  ${criteriaHeader}
+                </tr>
+              </thead>
+              <tbody>
+                ${matrixBody}
+              </tbody>
+            </table>
+          </div>
+          <div class="alert alert-info mt-3">
+            <small><i class="fas fa-info-circle me-1"></i> 
+            This view shows ${participantName}'s evaluations with average weights.</small>
+          </div>
+        `;
+        
+        contentContainer.appendChild(content);
+      });
+    }
+  </script>
+</body>
+</html> 

@@ -1,0 +1,223 @@
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card mb-4">
+      <div class="card-header bg-primary text-white">
+        <h3 class="card-title mb-0">Invite Collaborators for <%= collaborationType %></h3>
+      </div>
+      <div class="card-body">
+        <p class="lead">Invite collaborators to gather their input on <%= collaborationType %> for your decision: <strong><%= decisionName %></strong></p>
+        
+        <div class="alert alert-info">
+          <p class="mb-0"><strong>Note:</strong> Each participant gets a unique link. Collaborators don't need to create an account to provide their input.</p>
+        </div>
+        
+        <div class="card mb-4">
+          <div class="card-header bg-light">
+            <h4 class="mb-0">Participants</h4>
+          </div>
+          <div class="card-body">
+            <div id="participants-list">
+              <% if (participants && participants.length > 0) { %>
+                <% participants.forEach(function(participant, index) { %>
+                  <div class="participant-item mb-3">
+                    <div class="input-group mb-1">
+                      <span class="input-group-text" id="participant-<%= index %>-id">ID: <%= participant.id %></span>
+                      <input type="text" class="form-control" placeholder="Participant Name" aria-label="Participant Name" aria-describedby="participant-<%= index %>-id" value="<%= participant.name || 'Participant ' + (index + 1) %>">
+                      <button class="btn btn-outline-secondary" type="button" onclick="removeParticipant('<%= participant.id %>')">
+                        <i class="fas fa-times"></i>
+                      </button>
+                    </div>
+                    <div class="input-group">
+                      <input type="text" class="form-control participant-link" data-participant-id="<%= participant.id %>" readonly>
+                      <button class="btn btn-outline-primary copy-link-btn" type="button" data-participant-id="<%= participant.id %>">
+                        <i class="fas fa-copy"></i> Copy
+                      </button>
+                    </div>
+                  </div>
+                <% }); %>
+              <% } else { %>
+                <!-- Initial participant -->
+                <div class="participant-item mb-3">
+                  <div class="input-group mb-1">
+                    <span class="input-group-text" id="participant-0-id">ID: <%= initialParticipantId %></span>
+                    <input type="text" class="form-control" placeholder="Participant Name" aria-label="Participant Name" aria-describedby="participant-0-id" value="Participant 1">
+                    <button class="btn btn-outline-secondary disabled" type="button">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </div>
+                  <div class="input-group">
+                    <input type="text" class="form-control participant-link" data-participant-id="<%= initialParticipantId %>" readonly>
+                    <button class="btn btn-outline-primary copy-link-btn" type="button" data-participant-id="<%= initialParticipantId %>">
+                      <i class="fas fa-copy"></i> Copy
+                    </button>
+                  </div>
+                </div>
+              <% } %>
+            </div>
+            
+            <button type="button" class="btn btn-secondary mt-3" id="add-participant-btn">
+              <i class="fas fa-plus"></i> Add Another Participant
+            </button>
+          </div>
+        </div>
+        
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-primary" id="save-participants-btn">
+            <i class="fas fa-save"></i> Save Participants
+          </button>
+          <a href="/decision/<%= decisionId %>" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Decision
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Update all participant links when page loads
+    updateAllParticipantLinks();
+    
+    // Handle copy buttons for all participant links
+    document.querySelectorAll('.copy-link-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const linkInput = btn.previousElementSibling;
+        linkInput.select();
+        navigator.clipboard.writeText(linkInput.value).then(() => {
+          showToast('Link copied to clipboard!', 'success');
+        }).catch(err => {
+          showToast('Failed to copy link', 'error');
+          console.error('Could not copy text: ', err);
+        });
+      });
+    });
+    
+    // Handle add participant button
+    document.getElementById('add-participant-btn').addEventListener('click', function() {
+      addNewParticipant();
+    });
+    
+    // Handle save participants button
+    document.getElementById('save-participants-btn').addEventListener('click', function() {
+      saveParticipants();
+    });
+  });
+  
+  function updateAllParticipantLinks() {
+    const baseUrl = window.location.origin;
+    const collaborationTypeValue = '<%= collaborationType %>';
+    const linkType = collaborationTypeValue === 'Criteria Weights' ? 'criteria-weights' : 'alternatives-evaluation';
+    
+    document.querySelectorAll('.participant-link').forEach(input => {
+      const participantId = input.getAttribute('data-participant-id');
+      if (participantId) {
+        input.value = `${baseUrl}/participant/<%= decisionId %>/${linkType}/${participantId}`;
+      }
+    });
+  }
+  
+  function addNewParticipant() {
+    // Generate unique ID
+    const participantId = 'p_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    const participantsList = document.getElementById('participants-list');
+    const participantCount = participantsList.querySelectorAll('.participant-item').length;
+    
+    const newParticipantHtml = `
+      <div class="participant-item mb-3">
+        <div class="input-group mb-1">
+          <span class="input-group-text" id="participant-${participantCount}-id">ID: ${participantId}</span>
+          <input type="text" class="form-control" placeholder="Participant Name" aria-label="Participant Name" aria-describedby="participant-${participantCount}-id" value="Participant ${participantCount + 1}">
+          <button class="btn btn-outline-secondary" type="button" onclick="removeParticipant('${participantId}')">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="input-group">
+          <input type="text" class="form-control participant-link" data-participant-id="${participantId}" readonly>
+          <button class="btn btn-outline-primary copy-link-btn" type="button" data-participant-id="${participantId}">
+            <i class="fas fa-copy"></i> Copy
+          </button>
+        </div>
+      </div>
+    `;
+    
+    participantsList.insertAdjacentHTML('beforeend', newParticipantHtml);
+    
+    // Update the link for the new participant
+    updateAllParticipantLinks();
+    
+    // Add event listener to the new copy button
+    const newCopyBtn = participantsList.querySelector(`.copy-link-btn[data-participant-id="${participantId}"]`);
+    newCopyBtn.addEventListener('click', function() {
+      const linkInput = this.previousElementSibling;
+      linkInput.select();
+      navigator.clipboard.writeText(linkInput.value).then(() => {
+        showToast('Link copied to clipboard!', 'success');
+      }).catch(err => {
+        showToast('Failed to copy link', 'error');
+        console.error('Could not copy text: ', err);
+      });
+    });
+  }
+  
+  function removeParticipant(participantId) {
+    if (confirm('Are you sure you want to remove this participant?')) {
+      const participantItem = event.target.closest('.participant-item');
+      if (participantItem) {
+        participantItem.remove();
+        
+        // Renumber the remaining participants
+        const participantItems = document.querySelectorAll('.participant-item');
+        participantItems.forEach((item, index) => {
+          const nameInput = item.querySelector('input');
+          if (nameInput && nameInput.value.startsWith('Participant ')) {
+            nameInput.value = `Participant ${index + 1}`;
+          }
+        });
+      }
+    }
+  }
+  
+  function saveParticipants() {
+    const participantItems = document.querySelectorAll('.participant-item');
+    const participants = [];
+    
+    participantItems.forEach((item) => {
+      const idElement = item.querySelector('.input-group-text');
+      const nameInput = item.querySelector('input');
+      
+      if (idElement && nameInput) {
+        const idText = idElement.textContent;
+        const id = idText.replace('ID: ', '').trim();
+        const name = nameInput.value.trim() || `Participant ${participants.length + 1}`;
+        
+        participants.push({ id, name });
+      }
+    });
+    
+    // Send the participants data to the server
+    fetch('/save-participants', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        decisionId: '<%= decisionId %>',
+        collaborationType: '<%= collaborationType %>',
+        participants: participants
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showToast('Participants saved successfully!', 'success');
+      } else {
+        showToast(data.error || 'Failed to save participants', 'error');
+      }
+    })
+    .catch(error => {
+      console.error('Error saving participants:', error);
+      showToast('Error saving participants', 'error');
+    });
+  }
+</script> 

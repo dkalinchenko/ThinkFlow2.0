@@ -1,0 +1,1 @@
+const puppeteer = require("puppeteer"); (async () => { console.log("Testing homepage"); const browser = await puppeteer.launch({headless: false}); const page = await browser.newPage(); await page.goto("http://localhost:3333"); await page.screenshot({path: "homepage.png"}); await browser.close(); console.log("Test completed"); })();

@@ -12,8 +12,7 @@ class DecisionService {
    */
   async getDecision(id) {
     try {
-      const decision = await Decision.findByPk(id);
-      return decision;
+      return await Decision.findByPk(id);
     } catch (error) {
       logger.error('DECISION', 'Error getting decision', error);
       throw error;
@@ -27,11 +26,10 @@ class DecisionService {
    */
   async getUserDecisions(userId) {
     try {
-      const decisions = await Decision.findAll({
+      return await Decision.findAll({
         where: { userId },
         order: [['updatedAt', 'DESC']]
       });
-      return decisions;
     } catch (error) {
       logger.error('DECISION', 'Error getting user decisions', error);
       throw error;
@@ -46,7 +44,7 @@ class DecisionService {
    */
   async createDecision(data, userId = null) {
     try {
-      const decision = await Decision.create({
+      return await Decision.create({
         id: data.id,
         name: data.name,
         criteria: [],
@@ -56,7 +54,6 @@ class DecisionService {
         results: {},
         userId: userId
       });
-      return decision;
     } catch (error) {
       logger.error('DECISION', 'Error creating decision', error);
       throw error;
@@ -72,18 +69,17 @@ class DecisionService {
   async updateDecision(id, data) {
     try {
       const decision = await Decision.findByPk(id);
-      if (!decision) {
-        return null;
-      }
+      if (!decision) return null;
 
-      // Update only the fields that are provided
-      if (data.name !== undefined) decision.name = data.name;
-      if (data.criteria !== undefined) decision.criteria = data.criteria;
-      if (data.weights !== undefined) decision.weights = data.weights;
-      if (data.alternatives !== undefined) decision.alternatives = data.alternatives;
-      if (data.evaluations !== undefined) decision.evaluations = data.evaluations;
-      if (data.results !== undefined) decision.results = data.results;
-      if (data.userId !== undefined) decision.userId = data.userId;
+      // Update only provided fields 
+      const updateableFields = ['name', 'criteria', 'weights', 'alternatives', 
+                              'evaluations', 'results', 'userId', 'participants'];
+      
+      for (const field of updateableFields) {
+        if (data[field] !== undefined) {
+          decision[field] = data[field];
+        }
+      }
 
       await decision.save();
       return decision;
@@ -101,9 +97,8 @@ class DecisionService {
   async deleteDecision(id) {
     try {
       const decision = await Decision.findByPk(id);
-      if (!decision) {
-        return false;
-      }
+      if (!decision) return false;
+      
       await decision.destroy();
       return true;
     } catch (error) {
@@ -124,189 +119,117 @@ class DecisionService {
     try {
       let decision = await this.getDecision(data.id);
       
-      // For step 1, create a new decision
+      // Handle step 1 (creating or resetting a decision)
       if (step === 1) {
-        if (decision) {
-          // If decision already exists, update it
-          decision = await this.updateDecision(data.id, {
-            name: data.name,
-            criteria: [],
-            weights: {},
-            alternatives: [],
-            evaluations: {},
-            results: {},
-            userId: userId
-          });
-        } else {
-          // Create new decision
-          decision = await this.createDecision(data, userId);
-        }
-        return decision;
+        const newDecisionData = {
+          name: data.name,
+          criteria: [],
+          weights: {},
+          alternatives: [],
+          evaluations: {},
+          results: {},
+          userId: userId
+        };
+        
+        return decision 
+          ? await this.updateDecision(data.id, newDecisionData)
+          : await this.createDecision(data, userId);
       }
 
-      // For other steps, ensure decision exists
+      // For other steps, create a decision if it doesn't exist
       if (!decision) {
-        throw new Error('Decision not found');
+        if (!currentState) {
+          throw new Error('Decision not found and no current state provided');
+        }
+        
+        decision = await Decision.create({
+          id: data.id,
+          name: currentState.name || 'Untitled Decision',
+          criteria: currentState.criteria || [],
+          weights: currentState.weights || {},
+          alternatives: currentState.alternatives || [],
+          evaluations: currentState.evaluations || {},
+          results: currentState.results || {},
+          userId: userId
+        });
+        
+        logger.debug('PROCESS_STEP', `Created new decision for step ${step}`, { 
+          id: data.id, step, userId
+        });
       }
 
-      // Process step data
+      // Process step-specific data
       switch (step) {
         case 2: // Criteria
-          if (!Array.isArray(data.criteria) || data.criteria.length === 0) {
-            throw new Error('Please enter at least one criterion');
-          }
+          this.validateCriteria(data.criteria);
           
           // Update criteria and reset dependent fields
           decision = await this.updateDecision(data.id, {
             criteria: data.criteria,
-            weights: {}, // Reset weights
+            weights: this.initializeWeights(data.criteria),
             evaluations: {} // Reset evaluations
           });
-          
-          // Initialize weights
-          const weights = {};
-          data.criteria.forEach(criterion => {
-            weights[criterion] = 5; // Default to middle value
-          });
-          
-          decision = await this.updateDecision(data.id, { weights });
           break;
-
+          
         case 3: // Weights
-          if (!data.weights || typeof data.weights !== 'object') {
-            throw new Error('Invalid weights format');
-          }
+          this.validateWeights(data.weights, decision.criteria);
           
-          // Validate weights
-          const criteria = decision.criteria;
-          const invalidCriteria = Object.keys(data.weights).filter(
-            criterion => !criteria.includes(criterion)
-          );
-          
-          if (invalidCriteria.length > 0) {
-            throw new Error('Invalid criteria in weights');
-          }
-          
-          // Validate weight values
-          const newWeights = {};
-          for (const criterion of criteria) {
-            const weight = Number(data.weights[criterion]);
-            if (isNaN(weight) || weight < 1 || weight > 10) {
-              throw new Error(`Invalid weight value for ${criterion}. Must be between 1 and 10.`);
-            }
-            newWeights[criterion] = weight;
-          }
-          
-          decision = await this.updateDecision(data.id, { weights: newWeights });
+          // Update weights
+          decision = await this.updateDecision(data.id, {
+            weights: data.weights
+          });
           break;
-
+          
         case 4: // Alternatives
-          if (!Array.isArray(data.alternatives) || data.alternatives.length === 0) {
-            throw new Error('Please enter at least one alternative');
-          }
+          this.validateAlternatives(data.alternatives);
           
-          // Update alternatives and initialize evaluations
-          decision = await this.updateDecision(data.id, { alternatives: data.alternatives });
-          
-          // Initialize evaluations
-          const evaluations = {};
-          data.alternatives.forEach(alternative => {
-            evaluations[alternative] = {};
-            decision.criteria.forEach(criterion => {
-              evaluations[alternative][criterion] = 5; // Default to middle value
-            });
+          // Update alternatives and reset evaluations
+          decision = await this.updateDecision(data.id, {
+            alternatives: data.alternatives,
+            evaluations: this.initializeEvaluations(data.alternatives, decision.criteria)
           });
-          
-          decision = await this.updateDecision(data.id, { evaluations });
           break;
-
+          
         case 5: // Evaluations
-          if (!data.evaluations || typeof data.evaluations !== 'object') {
-            // Try using client state if available
-            if (currentState && currentState.evaluations) {
-              logger.debug('STEP5', 'Using evaluations from client state');
-              data.evaluations = currentState.evaluations;
-            } else {
-              logger.error('STEP5', 'Invalid evaluations format', data.evaluations);
-              throw new Error('Invalid evaluations format');
-            }
-          }
-          
-          // Validate evaluations
-          const alternatives = decision.alternatives;
-          if (!Array.isArray(alternatives) || alternatives.length === 0) {
-            logger.error('STEP5', 'No alternatives found in decision', decision.alternatives);
-            throw new Error('No alternatives defined for this decision');
-          }
-          
-          // Check that all defined alternatives have evaluations
-          logger.debug('STEP5', 'Validating evaluations for alternatives', {
-            definedAlternatives: alternatives,
-            providedEvaluationKeys: Object.keys(data.evaluations || {})
-          });
-          
-          const invalidAlternatives = Object.keys(data.evaluations || {}).filter(
-            alt => !alternatives.includes(alt)
-          );
-          
-          if (invalidAlternatives.length > 0) {
-            logger.error('STEP5', 'Invalid alternatives in evaluations', invalidAlternatives);
-            throw new Error('Invalid alternatives in evaluations');
-          }
-          
-          // Check that all alternatives in the decision have evaluations
-          const missingAlternatives = alternatives.filter(
-            alt => !Object.keys(data.evaluations || {}).includes(alt)
-          );
-          
-          if (missingAlternatives.length > 0) {
-            logger.error('STEP5', 'Missing evaluations for alternatives', missingAlternatives);
-            throw new Error(`Missing evaluations for alternatives: ${missingAlternatives.join(', ')}`);
-          }
-          
-          // Check that all criteria are evaluated for each alternative
-          const decisionCriteria = decision.criteria;
-          if (!Array.isArray(decisionCriteria) || decisionCriteria.length === 0) {
-            logger.error('STEP5', 'No criteria found in decision', decision.criteria);
-            throw new Error('No criteria defined for this decision');
-          }
-          
-          let missingEvaluations = [];
-          alternatives.forEach(alt => {
-            decisionCriteria.forEach(criterion => {
-              if (data.evaluations[alt][criterion] === undefined) {
-                missingEvaluations.push(`${alt}/${criterion}`);
-              }
-            });
-          });
-          
-          if (missingEvaluations.length > 0) {
-            logger.error('STEP5', 'Missing evaluation values', missingEvaluations);
-            throw new Error(`Missing evaluation values for: ${missingEvaluations.join(', ')}`);
-          }
-          
-          // Calculate results
-          logger.debug('STEP5', 'Calculating results with:', {
-            criteriaCount: decisionCriteria.length,
-            alternativesCount: alternatives.length,
-            evaluationsCount: Object.keys(data.evaluations).length
-          });
-          
           try {
+            // Make sure we have the required data
+            if (!Array.isArray(decision.criteria) || decision.criteria.length === 0) {
+              throw new Error('Decision has no criteria defined');
+            }
+            
+            if (!Array.isArray(decision.alternatives) || decision.alternatives.length === 0) {
+              throw new Error('Decision has no alternatives defined');
+            }
+            
+            if (!data.evaluations || typeof data.evaluations !== 'object') {
+              throw new Error('Invalid evaluations data format');
+            }
+            
+            // Validate all evaluations
+            this.validateEvaluations(data.evaluations, decision.alternatives, decision.criteria);
+            
+            // Calculate results
             const results = this.calculateResults(
-              decisionCriteria,
+              decision.criteria,
               decision.weights,
               data.evaluations
             );
             
-            // Update evaluations and results
+            // Update decision
             decision = await this.updateDecision(data.id, {
               evaluations: data.evaluations,
               results
             });
           } catch (error) {
-            logger.error('STEP5', 'Error calculating results', error);
-            throw new Error(`Error calculating results: ${error.message}`);
+            logger.error('DECISION_STEP5', 'Error processing evaluations', { 
+              error: error.message,
+              decisionId: data.id,
+              hasAlternatives: Array.isArray(decision.alternatives),
+              alternativesCount: Array.isArray(decision.alternatives) ? decision.alternatives.length : 0,
+              hasCriteria: Array.isArray(decision.criteria),
+              criteriaCount: Array.isArray(decision.criteria) ? decision.criteria.length : 0
+            });
+            throw error;
           }
           break;
       }
@@ -317,90 +240,310 @@ class DecisionService {
       throw error;
     }
   }
+  
+  /**
+   * Validate criteria data
+   */
+  validateCriteria(criteria) {
+    if (!Array.isArray(criteria) || criteria.length === 0) {
+      throw new Error('Please enter at least one criterion');
+    }
+    
+    // Check for duplicate criteria
+    const uniqueCriteria = new Set(criteria);
+    if (uniqueCriteria.size !== criteria.length) {
+      throw new Error('Duplicate criteria are not allowed');
+    }
+  }
+  
+  /**
+   * Initialize weights for criteria
+   */
+  initializeWeights(criteria) {
+    const weights = {};
+    const equalWeight = criteria.length > 0 ? 100 / criteria.length : 0;
+    
+    criteria.forEach(criterion => {
+      if (criterion && criterion.trim()) {
+        weights[criterion] = equalWeight;
+      }
+    });
+    
+    return weights;
+  }
+  
+  /**
+   * Validate weights data
+   */
+  validateWeights(weights, criteria) {
+    if (!weights || typeof weights !== 'object') {
+      throw new Error('Invalid weights format');
+    }
+    
+    // Ensure all criteria have weights
+    criteria.forEach(criterion => {
+      if (weights[criterion] === undefined) {
+        throw new Error(`Missing weight for criterion: ${criterion}`);
+      }
+    });
+    
+    // Check total is approximately 100%
+    const total = Object.values(weights).reduce((sum, w) => sum + Number(w), 0);
+    if (Math.abs(total - 100) > 1) { // Allow small rounding errors
+      throw new Error(`Weights must total 100% (current total: ${total.toFixed(1)}%)`);
+    }
+  }
+  
+  /**
+   * Validate alternatives data
+   */
+  validateAlternatives(alternatives) {
+    if (!Array.isArray(alternatives) || alternatives.length === 0) {
+      throw new Error('Please enter at least one alternative');
+    }
+    
+    // Check for duplicate alternatives
+    const uniqueAlternatives = new Set(alternatives);
+    if (uniqueAlternatives.size !== alternatives.length) {
+      throw new Error('Duplicate alternatives are not allowed');
+    }
+  }
+  
+  /**
+   * Initialize empty evaluation structure
+   */
+  initializeEvaluations(alternatives, criteria) {
+    const evaluations = {};
+    
+    alternatives.forEach(alt => {
+      evaluations[alt] = {};
+      criteria.forEach(criterion => {
+        evaluations[alt][criterion] = 0; // Default score
+      });
+    });
+    
+    return evaluations;
+  }
+  
+  /**
+   * Validate evaluations data
+   */
+  validateEvaluations(evaluations, alternatives, criteria) {
+    if (!evaluations || typeof evaluations !== 'object') {
+      throw new Error('Invalid evaluations format');
+    }
+    
+    // Ensure alternatives is an array
+    if (!Array.isArray(alternatives)) {
+      throw new Error('Alternatives must be an array');
+    }
+    
+    // Check that all alternatives have evaluations
+    const missingAlternatives = alternatives.filter(
+      alt => !Object.keys(evaluations).includes(alt)
+    );
+    
+    if (missingAlternatives.length > 0) {
+      throw new Error(`Missing evaluations for alternatives: ${missingAlternatives.join(', ')}`);
+    }
+    
+    // Check that all criteria are evaluated for each alternative
+    const missingEvaluations = [];
+    alternatives.forEach(alt => {
+      criteria.forEach(criterion => {
+        if (evaluations[alt][criterion] === undefined) {
+          missingEvaluations.push(`${alt}/${criterion}`);
+        }
+      });
+    });
+    
+    if (missingEvaluations.length > 0) {
+      throw new Error(`Missing evaluation values for: ${missingEvaluations.join(', ')}`);
+    }
+  }
 
   /**
    * Calculate decision results
    * @param {Array} criteria - List of criteria
-   * @param {Object} weights - Criteria weights
+   * @param {Object} weights - Criteria weights as percentages (0-100%)
    * @param {Object} evaluations - Alternative evaluations
    * @returns {Object} - Results for each alternative
    */
   calculateResults(criteria, weights, evaluations) {
-    try {
-      logger.debug('CALCULATION', 'Starting calculation with:', {
-        criteriaCount: criteria?.length,
-        weightsKeys: Object.keys(weights || {}),
-        evaluationsKeys: Object.keys(evaluations || {})
+    this.validateInputsForCalculation(criteria, weights, evaluations);
+    
+    const results = {};
+    const alternatives = Object.keys(evaluations);
+    
+    // Calculate scores for each alternative
+    alternatives.forEach(alternative => {
+      const breakdown = {};
+      let totalScore = 0;
+      
+      criteria.forEach(criterion => {
+        const weight = Number(weights[criterion] || 0) / 100; // Convert percentage to decimal
+        const score = Number(evaluations[alternative][criterion] || 0);
+        const weightedScore = weight * score;
+        
+        breakdown[criterion] = parseFloat(weightedScore.toFixed(2));
+        totalScore += weightedScore;
       });
       
-      // Validate all required data exists
-      if (!Array.isArray(criteria) || criteria.length === 0) {
-        logger.error('CALCULATION', 'Invalid criteria array', criteria);
-        throw new Error('Missing or invalid criteria');
+      results[alternative] = {
+        score: parseFloat(totalScore.toFixed(2)),
+        breakdown
+      };
+    });
+    
+    // Calculate ranks
+    const sortedAlternatives = alternatives.sort((a, b) => 
+      results[b].score - results[a].score
+    );
+    
+    sortedAlternatives.forEach((alternative, index) => {
+      results[alternative].rank = index + 1;
+    });
+    
+    return results;
+  }
+  
+  /**
+   * Validate inputs for calculation
+   */
+  validateInputsForCalculation(criteria, weights, evaluations) {
+    // Check criteria
+    if (!criteria) {
+      throw new Error('Missing criteria');
+    }
+    
+    if (!Array.isArray(criteria)) {
+      throw new Error('Criteria must be an array');
+    }
+    
+    if (criteria.length === 0) {
+      throw new Error('Criteria array is empty');
+    }
+    
+    // Check weights
+    if (!weights) {
+      throw new Error('Missing weights');
+    }
+    
+    if (typeof weights !== 'object' || Array.isArray(weights)) {
+      throw new Error('Weights must be an object');
+    }
+    
+    // Check evaluations
+    if (!evaluations) {
+      throw new Error('Missing evaluations');
+    }
+    
+    if (typeof evaluations !== 'object' || Array.isArray(evaluations)) {
+      throw new Error('Evaluations must be an object');
+    }
+    
+    if (Object.keys(evaluations).length === 0) {
+      throw new Error('No alternatives in evaluations');
+    }
+    
+    // Ensure all criteria have weights
+    criteria.forEach(criterion => {
+      if (weights[criterion] === undefined) {
+        throw new Error(`Missing weight for criterion: ${criterion}`);
       }
+    });
+  }
+
+  /**
+   * Calculate results with participant data
+   * @param {Object} decision - Decision with participant data
+   * @returns {Object} - Results calculated with participant input
+   */
+  calculateResultsWithParticipants(decision) {
+    const participants = decision.participants || { weights: [], evaluations: [] };
+    
+    // Get completed participants
+    const weightParticipants = (participants.weights || []).filter(p => p.completed);
+    const evalParticipants = (participants.evaluations || []).filter(p => p.completed);
+    
+    // If no participants have completed, use owner's data only
+    if (weightParticipants.length === 0 && evalParticipants.length === 0) {
+      return this.calculateResults(decision.criteria, decision.weights, decision.evaluations);
+    }
+    
+    // Combine weights from all participants
+    const combinedWeights = weightParticipants.length > 0 
+      ? this.combineParticipantWeights(decision.weights, weightParticipants)
+      : decision.weights;
+    
+    // Combine evaluations from all participants  
+    const combinedEvaluations = evalParticipants.length > 0
+      ? this.combineParticipantEvaluations(decision.evaluations, evalParticipants)
+      : decision.evaluations;
+    
+    // Calculate results with combined data
+    return this.calculateResults(decision.criteria, combinedWeights, combinedEvaluations);
+  }
+  
+  /**
+   * Combine weights from participants
+   */
+  combineParticipantWeights(ownerWeights, participants) {
+    const combined = { ...ownerWeights };
+    const participantCount = participants.length + 1; // +1 for owner
+    
+    Object.keys(combined).forEach(criterion => {
+      let totalWeight = Number(combined[criterion] || 0);
       
-      if (!weights || typeof weights !== 'object') {
-        logger.error('CALCULATION', 'Invalid weights object', weights);
-        throw new Error('Missing or invalid weights');
-      }
+      participants.forEach(participant => {
+        totalWeight += Number(participant.data[criterion] || 0);
+      });
       
-      if (!evaluations || typeof evaluations !== 'object') {
-        logger.error('CALCULATION', 'Invalid evaluations object', evaluations);
-        throw new Error('Missing or invalid evaluations');
-      }
+      // Average weights across all participants
+      combined[criterion] = totalWeight / participantCount;
+    });
+    
+    // Normalize weights to ensure they sum to 100%
+    const totalWeight = Object.values(combined).reduce((sum, w) => sum + Number(w), 0);
+    
+    if (totalWeight > 0) {
+      Object.keys(combined).forEach(criterion => {
+        combined[criterion] = (combined[criterion] / totalWeight) * 100;
+      });
+    }
+    
+    return combined;
+  }
+  
+  /**
+   * Combine evaluations from participants
+   */
+  combineParticipantEvaluations(ownerEvals, participants) {
+    const combined = {};
+    const alternatives = Object.keys(ownerEvals);
+    
+    alternatives.forEach(alternative => {
+      combined[alternative] = { ...ownerEvals[alternative] };
+      const criteria = Object.keys(combined[alternative]);
       
-      const results = {};
-      
-      // Calculate total weights
-      const totalWeight = Object.values(weights).reduce(
-        (sum, weight) => sum + Number(weight), 0
-      );
-      
-      logger.debug('CALCULATION', `Total weight calculated: ${totalWeight}`);
-      
-      if (totalWeight === 0) {
-        logger.error('CALCULATION', 'Total weight is zero');
-        throw new Error('Total weight cannot be zero');
-      }
-      
-      // Calculate scores for each alternative
-      Object.keys(evaluations).forEach(alternative => {
-        let totalWeightedScore = 0;
+      criteria.forEach(criterion => {
+        let totalScore = Number(combined[alternative][criterion] || 0);
+        let participantCount = 1; // Start with 1 for owner
         
-        logger.debug('CALCULATION', `Processing alternative: ${alternative}`);
-        
-        criteria.forEach(criterion => {
-          const weight = Number(weights[criterion] || 0);
-          const normalizedWeight = weight / totalWeight;
-          
-          // Validate that the evaluation exists for this criterion
-          if (!evaluations[alternative] || evaluations[alternative][criterion] === undefined) {
-            logger.error('CALCULATION', `Missing evaluation for ${alternative}/${criterion}`);
-            throw new Error(`Missing evaluation for ${alternative}/${criterion}`);
+        participants.forEach(participant => {
+          const participantScore = participant.data[alternative]?.[criterion];
+          if (participantScore !== undefined) {
+            totalScore += Number(participantScore);
+            participantCount++;
           }
-          
-          const score = Number(evaluations[alternative][criterion]);
-          if (isNaN(score)) {
-            logger.error('CALCULATION', `Invalid score for ${alternative}/${criterion}: ${evaluations[alternative][criterion]}`);
-            throw new Error(`Invalid score for ${alternative}/${criterion}`);
-          }
-          
-          const weightedScore = normalizedWeight * score;
-          logger.debug('CALCULATION', `  ${criterion}: weight=${weight}, norm=${normalizedWeight.toFixed(2)}, score=${score}, weighted=${weightedScore.toFixed(2)}`);
-          
-          totalWeightedScore += weightedScore;
         });
         
-        results[alternative] = Math.round(totalWeightedScore * 100) / 100;
-        logger.debug('CALCULATION', `Final score for ${alternative}: ${results[alternative]}`);
+        // Average scores across all participants
+        combined[alternative][criterion] = totalScore / participantCount;
       });
-      
-      logger.debug('CALCULATION', 'Calculation completed successfully', results);
-      return results;
-    } catch (error) {
-      logger.error('CALCULATION', 'Error in calculation', error);
-      throw error;
-    }
+    });
+    
+    return combined;
   }
 
   /**
@@ -415,11 +558,34 @@ class DecisionService {
       let decision = await this.getDecision(decisionId);
       
       if (decision) {
-        // Update existing decision
-        decision = await this.updateDecision(decisionId, {
+        // Update decision with new data
+        const updatedData = {
           ...decisionData,
           userId: userId
-        });
+        };
+        
+        // Save the updated decision
+        decision = await this.updateDecision(decisionId, updatedData);
+        
+        // If there are participants, recalculate the results with participant data
+        if (decision.participants && 
+            ((decision.participants.weights && decision.participants.weights.length > 0) || 
+            (decision.participants.evaluations && decision.participants.evaluations.length > 0))) {
+          
+          logger.debug('SAVE_DECISION', 'Recalculating results with participant data', {
+            decisionId,
+            weightParticipants: decision.participants.weights?.length || 0,
+            evalParticipants: decision.participants.evaluations?.length || 0
+          });
+          
+          // Calculate results incorporating participant data
+          const enhancedResults = this.calculateResultsWithParticipants(decision);
+          
+          // Update the decision with new results and updated weights
+          decision = await this.updateDecision(decisionId, {
+            results: enhancedResults
+          });
+        }
       } else {
         // Create new decision
         decision = await Decision.create({
@@ -437,4 +603,4 @@ class DecisionService {
   }
 }
 
-module.exports = new DecisionService(); 
+module.exports = new DecisionService();

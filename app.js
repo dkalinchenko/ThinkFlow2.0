@@ -10,8 +10,10 @@ const decisionService = require('./services/decisionService');
 const logger = require('./utils/logger');
 const { checkAuthenticated } = require('./middleware/auth');
 
-// Import website routes
+// Import routes
 const websiteRoutes = require('./routes/website');
+const authRoutes = require('./routes/auth');
+const decisionsRoutes = require('./routes/decisions');
 
 const app = express();
 const port = process.env.PORT || 3333;
@@ -166,7 +168,38 @@ app.post('/save-step', async (req, res) => {
         const decision = await decisionService.processStep(step, data, currentState, userId);
         logger.debug('SAVE_STEP', 'Step processed successfully', decision);
 
-        // Prepare response
+        // For step 5 (evaluation completed), save the decision and redirect to view-decision
+        if (step === 5) {
+            try {
+                // Create a complete decision object with all necessary data
+                const completeDecision = {
+                    id: data.id,
+                    name: decision.name,
+                    criteria: decision.criteria,
+                    weights: decision.weights,
+                    alternatives: decision.alternatives,
+                    evaluations: decision.evaluations,
+                    results: decision.results
+                };
+
+                // Save the decision to the database (for both guests and logged-in users)
+                const savedDecision = await decisionService.saveDecisionToUser(data.id, userId, completeDecision);
+                
+                logger.debug('SAVE_STEP', 'Decision saved, redirecting to view-decision', { decisionId: data.id });
+                
+                // Return redirect information
+                return res.json({
+                    success: true,
+                    redirect: `/decision/${data.id}`,
+                    decisionId: data.id
+                });
+            } catch (error) {
+                logger.error('SAVE_STEP', 'Error saving decision for redirection', error);
+                // If there's an error saving, fall back to the regular JSON response
+            }
+        }
+
+        // For all other steps, prepare the regular response
         const response = { 
             success: true,
             nextStep: step + 1,
@@ -177,11 +210,6 @@ app.post('/save-step', async (req, res) => {
             isAuthenticated: req.isAuthenticated(),
             user: req.user ? { id: req.user.id } : null
         };
-
-        // Add results for step 5
-        if (step === 5) {
-            response.results = decision.results;
-        }
 
         logger.debug('SAVE_STEP', 'Sending response', response);
         res.json(response);
@@ -196,53 +224,30 @@ app.post('/save-step', async (req, res) => {
 });
 
 // Auth routes
-app.use('/', require('./routes/auth'));
+app.use('/', authRoutes);
 
 // Decision routes
-app.use('/', require('./routes/decisions'));
+app.use('/', decisionsRoutes);
 
-// Error handling middleware
+// Error handling
+app.use((req, res, next) => {
+  res.status(404).render('error', {
+    title: 'Page Not Found',
+    message: 'The page you requested could not be found.',
+    statusCode: 404
+  });
+});
+
 app.use((err, req, res, next) => {
-  logger.error('SERVER', 'Unhandled error', err);
-  res.status(500).send('Something went wrong. Please try again.');
+  logger.error('SERVER', 'Unexpected error', err);
+  res.status(500).render('error', {
+    title: 'Server Error',
+    message: 'An unexpected error occurred. Please try again later.',
+    statusCode: 500
+  });
 });
 
-// Start server with explicit error handling
-const server = app.listen(port, '0.0.0.0', () => {
-    console.log(`[INFO][SERVER] Decision Matrix App is running on port ${port}`);
-    console.log(`[INFO][SERVER] http://localhost:${port}`);
-});
-
-// Handle server errors
-server.on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-        logger.error('SERVER', `Port ${port} is already in use`);
-    } else {
-        logger.error('SERVER', 'Server error', error);
-    }
-    process.exit(1);
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-    logger.error('SERVER', 'Uncaught exception', error);
-    // Give the server a chance to send any pending responses before exiting
-    setTimeout(() => {
-        process.exit(1);
-    }, 1000);
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-    logger.error('SERVER', 'Unhandled promise rejection', { reason });
-    // Keep the process running but log the error
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    logger.info('SERVER', 'Shutting down gracefully');
-    server.close(() => {
-        logger.info('SERVER', 'Server closed');
-        process.exit(0);
-    });
+// Start server
+app.listen(port, () => {
+  logger.info('SERVER', `Server running on port ${port}`);
 });

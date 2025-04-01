@@ -1,180 +1,800 @@
-<div class="row">
-  <div class="col-md-12">
-    <div class="mb-3">
-      <a href="/my-decisions" class="btn btn-outline-primary">
-        <i class="fas fa-arrow-left"></i> Back to My Decisions
-      </a>
-    </div>
-    
-    <div class="card">
-      <div class="card-header bg-primary text-white">
-        <h2 class="mb-0"><%= decision.name %></h2>
-      </div>
-      <div class="card-body">
-        <div class="row mb-4">
-          <div class="col-md-6">
-            <h4>Decision Details</h4>
-            <p><strong>Created:</strong> <%= new Date(decision.createdAt).toLocaleString() %></p>
-            <p><strong>Last Updated:</strong> <%= new Date(decision.updatedAt).toLocaleString() %></p>
+<div class="container mt-5 mb-5">
+  <div class="row">
+    <div class="col-md-12">
+      <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+          <h2 class="mb-0"><%= decision.name %> - Results Dashboard</h2>
+        </div>
+        
+        <!-- Collaboration Box -->
+        <div class="card-body bg-light p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2" data-bs-toggle="collapse" href="#collaborationOptions" role="button" aria-expanded="true" aria-controls="collaborationOptions">
+            <h5 class="mb-0"><i class="fas fa-users me-2"></i>Collaboration Options</h5>
+            <button class="btn btn-sm btn-outline-secondary" type="button">
+              <i class="fas fa-chevron-down" id="collapseIcon"></i>
+            </button>
+          </div>
+          
+          <div class="collapse show" id="collaborationOptions">
+            <div class="card card-body">
+              <p class="mb-3">
+                You can invite others to contribute to your decision in two ways:
+              </p>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <div class="d-flex flex-column h-100">
+                    <h6><i class="fas fa-balance-scale me-2"></i>Criteria Weights</h6>
+                    <p class="mb-3 flex-grow-1">Ask others to help you determine how important each criterion is. Their weights will be averaged with yours.</p>
+                    <a href="/collaboration-setup/<%= decision.id %>/criteria-weights" class="btn btn-outline-primary">
+                      <i class="fas fa-user-plus me-1"></i> Invite for Weights
+                    </a>
+                  </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <div class="d-flex flex-column h-100">
+                    <h6><i class="fas fa-star-half-alt me-2"></i>Alternative Evaluations</h6>
+                    <p class="mb-3 flex-grow-1">Ask others to help you evaluate how well each alternative performs against the criteria. Their evaluations will be averaged with yours.</p>
+                    <a href="/collaboration-setup/<%= decision.id %>/alternatives-evaluation" class="btn btn-outline-primary">
+                      <i class="fas fa-user-plus me-1"></i> Invite for Evaluations
+                    </a>
+                  </div>
+                </div>
+              </div>
+              
+              <% 
+              // Check if there are any participants who have submitted data
+              const hasCompletedParticipants = ((decision.participants?.weights && decision.participants.weights.some(p => p.completed)) || 
+                                              (decision.participants?.evaluations && decision.participants.evaluations.some(p => p.completed)));
+              %>
+              <% if (hasCompletedParticipants) { %>
+                <div class="mt-3 border-top pt-3">
+                  <h6><i class="fas fa-chart-bar me-2"></i>Analyze Participant Input</h6>
+                  <p class="mb-3">View detailed visualizations of how different participants contributed to this decision.</p>
+                  <a href="/participant-dashboard/<%= decision.id %>" class="btn btn-success">
+                    <i class="fas fa-chart-bar me-1"></i> View Participant Comparison Dashboard
+                  </a>
+                </div>
+              <% } %>
+            </div>
           </div>
         </div>
         
-        <div class="row mb-4">
-          <div class="col-md-6">
-            <div class="card">
-              <div class="card-header bg-light">
-                <h4 class="mb-0">Criteria</h4>
-              </div>
-              <div class="card-body">
-                <% if (decision.criteria && decision.criteria.length > 0) { %>
-                  <ul class="list-group">
-                    <% decision.criteria.forEach(function(criterion) { %>
-                      <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <%= criterion %>
-                        <span class="badge bg-primary rounded-pill">Weight: <%= decision.weights[criterion] %></span>
-                      </li>
-                    <% }); %>
-                  </ul>
-                <% } else { %>
-                  <p class="text-muted">No criteria defined</p>
-                <% } %>
+        <div class="card-body">
+          <!-- Debug Information (hidden by default) -->
+          <div class="card mb-4 d-none" id="debug-info-card">
+            <div class="card-header bg-secondary text-white">
+              <h5 class="card-title mb-0">Debug Information</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col">
+                  <h6>Decision ID: <%= decision.id %></h6>
+                  <h6>Name: <%= decision.name %></h6>
+                  <h6>Criteria: <%= JSON.stringify(decision.criteria) %></h6>
+                  <h6>Weights (Percentages): <%= JSON.stringify(decision.weights) %></h6>
+                  
+                  <% 
+                    // No need to calculate normalized weights anymore since weights are already percentages
+                    const weightPercentages = {};
+                    
+                    // Get weights as percentages
+                    for (const criterion of decision.criteria || []) {
+                      weightPercentages[criterion] = Math.round(Number(decision.weights[criterion] || 0)) + '%';
+                    }
+                  %>
+                  
+                  <h6>Weight Percentages: <%= JSON.stringify(weightPercentages) %></h6>
+                  <h6>Alternatives: <%= JSON.stringify(decision.alternatives) %></h6>
+                  <h6>Results Structure: <%= typeof decision.results %></h6>
+                  <h6>Results Keys: <%= JSON.stringify(Object.keys(decision.results || {})) %></h6>
+                  <% if (decision.results && Object.keys(decision.results).length > 0) { %>
+                    <h6>First Result Sample: <%= JSON.stringify({ [Object.keys(decision.results)[0]]: decision.results[Object.keys(decision.results)[0]] }) %></h6>
+                  <% } %>
+                  <h6>Weight Participants: <%= decision.participants?.weights?.length || 0 %></h6>
+                  <h6>Evaluation Participants: <%= decision.participants?.evaluations?.length || 0 %></h6>
+                  <h6>Completed Weight Participants: <%= decision.participants?.weights?.filter(p => p.completed).length || 0 %></h6>
+                  <h6>Completed Evaluation Participants: <%= decision.participants?.evaluations?.filter(p => p.completed).length || 0 %></h6>
+                </div>
               </div>
             </div>
           </div>
           
-          <div class="col-md-6">
-            <div class="card">
-              <div class="card-header bg-light">
-                <h4 class="mb-0">Alternatives</h4>
-              </div>
-              <div class="card-body">
-                <% if (decision.alternatives && decision.alternatives.length > 0) { %>
-                  <ul class="list-group">
-                    <% decision.alternatives.forEach(function(alternative) { %>
-                      <li class="list-group-item"><%= alternative %></li>
-                    <% }); %>
-                  </ul>
-                <% } else { %>
-                  <p class="text-muted">No alternatives defined</p>
-                <% } %>
-              </div>
-            </div>
+          <div class="alert alert-info mb-3">
+            <button class="btn btn-sm btn-outline-info float-end" onclick="document.getElementById('debug-info-card').classList.toggle('d-none')">Toggle Debug Info</button>
+            <p class="mb-0">View this decision at: <a href="http://localhost:3334/decision/<%= decision.id %>" class="alert-link">http://localhost:3334/decision/<%= decision.id %></a></p>
+            <p class="mt-2 mb-0"><strong>Note:</strong> Criteria weights are shown as percentages (0-100%). The weights you set should sum to 100% for most accurate results.</p>
           </div>
-        </div>
-        
-        <% if (decision.results && Object.keys(decision.results).length > 0) { %>
-          <div class="row">
+          
+          <% if (decision.participants && 
+                ((decision.participants.weights && decision.participants.weights.some(p => p.completed)) || 
+                (decision.participants.evaluations && decision.participants.evaluations.some(p => p.completed)))) { %>
+            <div class="alert alert-success mb-3">
+              <i class="fas fa-users me-2"></i> These results incorporate feedback from 
+              <% 
+                const completedWeightParticipants = decision.participants.weights ? decision.participants.weights.filter(p => p.completed) : [];
+                const completedEvalParticipants = decision.participants.evaluations ? decision.participants.evaluations.filter(p => p.completed) : [];
+                const totalParticipants = completedWeightParticipants.length + completedEvalParticipants.length;
+              %>
+              <strong><%= totalParticipants %> participant<%= totalParticipants !== 1 ? 's' : '' %></strong>.
+              <% if (completedWeightParticipants.length > 0) { %>
+                <span class="badge bg-primary"><%= completedWeightParticipants.length %> criteria weights</span>
+              <% } %>
+              <% if (completedEvalParticipants.length > 0) { %>
+                <span class="badge bg-primary"><%= completedEvalParticipants.length %> alternative evaluations</span>
+              <% } %>
+              
+              <!-- Participant Weights Table -->
+              <% if (completedWeightParticipants.length > 0) { %>
+                <div class="mt-3">
+                  <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" 
+                          data-bs-target="#participantWeightsTable" aria-expanded="false" aria-controls="participantWeightsTable">
+                    <i class="fas fa-table me-1"></i> View Participant Weight Details
+                  </button>
+                  
+                  <div class="collapse mt-3" id="participantWeightsTable">
+                    <div class="card card-body">
+                      <h5 class="mb-3">Criteria Weight Contributions</h5>
+                      
+                      <div class="table-responsive">
+                        <table class="table table-bordered table-sm">
+                          <thead class="table-light">
+                            <tr>
+                              <th>Contributor</th>
+                              <% decision.criteria.forEach(criterion => { %>
+                                <th><%= criterion %></th>
+                              <% }); %>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <!-- User's original weights -->
+                            <tr>
+                              <td><strong>Your Weights</strong></td>
+                              <% decision.criteria.forEach(criterion => { %>
+                                <% const userWeight = Number(decision.weights[criterion] || 0).toFixed(0); %>
+                                <td><%= userWeight %>%</td>
+                              <% }); %>
+                            </tr>
+                            
+                            <!-- Participants' weights -->
+                            <% completedWeightParticipants.forEach(participant => { %>
+                              <tr>
+                                <td><%= participant.name || 'Participant' %></td>
+                                <% decision.criteria.forEach(criterion => { %>
+                                  <% 
+                                    let participantWeight = Number(participant.data[criterion] || 0);
+                                    // Convert from 1-10 scale to percentage if needed
+                                    if (participantWeight >= 0 && participantWeight <= 10 && decision.criteria.length > 1) {
+                                      participantWeight = participantWeight * 10;
+                                    }
+                                  %>
+                                  <td><%= participantWeight.toFixed(0) %>%</td>
+                                <% }); %>
+                              </tr>
+                            <% }); %>
+                            
+                            <!-- Computed average weights -->
+                            <tr class="table-success">
+                              <td><strong>Calculated Average</strong></td>
+                              <% decision.criteria.forEach(criterion => { %>
+                                <% 
+                                  // Get original weight (default to equal percentage if not present)
+                                  const originalWeight = Number(decision.weights[criterion] || (100 / decision.criteria.length));
+                                  let totalWeight = originalWeight;
+                                  let participantCount = 1; // Start with 1 to count the original weight
+                                  
+                                  // Add weights from participants
+                                  completedWeightParticipants.forEach(participant => {
+                                    if (participant.data && participant.data[criterion] !== undefined) {
+                                      // Get the participant weight - could be on scale 1-10 or direct percentage
+                                      let participantWeight = Number(participant.data[criterion]);
+                                      
+                                      // Convert participant weight to percentage format (0-100) if needed
+                                      if (participantWeight >= 0 && participantWeight <= 10) {
+                                        // Convert from scale of 1-10 to percentage
+                                        participantWeight = participantWeight * 10;
+                                      }
+                                      
+                                      if (!isNaN(participantWeight)) {
+                                        totalWeight += participantWeight;
+                                        participantCount++;
+                                      }
+                                    }
+                                  });
+                                  
+                                  // Calculate average weight
+                                  const calculatedAverage = totalWeight / participantCount;
+                                %>
+                                <td><strong><%= calculatedAverage.toFixed(1) %>%</strong></td>
+                              <% }); %>
+                            </tr>
+                            
+                            <!-- System actual weights (for verification) -->
+                            <tr class="table-primary">
+                              <td><strong>System Display Value</strong></td>
+                              <% decision.criteria.forEach(criterion => { %>
+                                <% 
+                                  // Use the exact same calculation as in the "Calculated Average" row
+                                  // to ensure consistency
+                                  const originalWeight = Number(decision.weights[criterion] || (100 / decision.criteria.length));
+                                  let totalWeight = originalWeight;
+                                  let participantCount = 1; // Start with 1 to count the original weight
+                                  
+                                  // Add weights from participants
+                                  completedWeightParticipants.forEach(participant => {
+                                    if (participant.data && participant.data[criterion] !== undefined) {
+                                      // Get the participant weight - could be on scale 1-10 or direct percentage
+                                      let participantWeight = Number(participant.data[criterion]);
+                                      
+                                      // Convert participant weight to percentage format (0-100) if needed
+                                      if (participantWeight >= 0 && participantWeight <= 10) {
+                                        // Convert from scale of 1-10 to percentage
+                                        participantWeight = participantWeight * 10;
+                                      }
+                                      
+                                      if (!isNaN(participantWeight)) {
+                                        totalWeight += participantWeight;
+                                        participantCount++;
+                                      }
+                                    }
+                                  });
+                                  
+                                  // Calculate average weight
+                                  const displayWeight = totalWeight / participantCount;
+                                %>
+                                <td><strong><%= displayWeight.toFixed(1) %>%</strong></td>
+                              <% }); %>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      <div class="mt-2 small text-muted">
+                        <p class="mb-0"><i class="fas fa-info-circle me-1"></i> The "Calculated Average" row shows the mathematical average of all weights. The "System Display Value" shows the actual weight values used in calculations.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <% } %>
+            </div>
+          <% } %>
+
+          <!-- Results Section -->
+          <div class="row mb-4">
             <div class="col-md-12">
               <div class="card">
                 <div class="card-header bg-light">
                   <h4 class="mb-0">Results</h4>
                 </div>
                 <div class="card-body">
-                  <div class="results-chart">
-                    <canvas id="resultsChart"></canvas>
-                  </div>
-                  
-                  <div class="table-responsive mt-4">
-                    <table class="table table-striped">
-                      <thead>
-                        <tr>
-                          <th>Alternative</th>
-                          <th>Score</th>
-                          <th>Rank</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <% 
-                          // Sort alternatives by score
-                          const sortedAlternatives = Object.keys(decision.results).sort((a, b) => 
-                            decision.results[b] - decision.results[a]
-                          );
-                        %>
-                        <% sortedAlternatives.forEach(function(alternative, index) { %>
-                          <tr>
-                            <td><%= alternative %></td>
-                            <td><%= decision.results[alternative].toFixed(2) %></td>
-                            <td><%= index + 1 %></td>
-                          </tr>
-                        <% }); %>
-                      </tbody>
-                    </table>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="results-chart">
+                        <canvas id="resultsChart"></canvas>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="table-responsive">
+                        <table class="table table-striped">
+                          <thead>
+                            <tr>
+                              <th>Alternative</th>
+                              <th>Score</th>
+                              <th>Rank</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <% 
+                              try {
+                                if (decision.results && typeof decision.results === 'object') {
+                                  const allAlternatives = [...new Set([
+                                    ...Object.keys(decision.results),
+                                    ...(decision.alternatives || [])
+                                  ])];
+                                  
+                                  const sortedAlternatives = allAlternatives.sort((a, b) => {
+                                    let scoreA = 0;
+                                    let scoreB = 0;
+                                    
+                                    if (decision.results[a]) {
+                                      if (typeof decision.results[a] === 'object' && decision.results[a].score !== undefined) {
+                                        scoreA = Number(decision.results[a].score) || 0;
+                                      } else if (typeof decision.results[a] === 'number') {
+                                        scoreA = decision.results[a];
+                                      }
+                                    }
+                                    
+                                    if (decision.results[b]) {
+                                      if (typeof decision.results[b] === 'object' && decision.results[b].score !== undefined) {
+                                        scoreB = Number(decision.results[b].score) || 0;
+                                      } else if (typeof decision.results[b] === 'number') {
+                                        scoreB = decision.results[b];
+                                      }
+                                    }
+                                    
+                                    return scoreB - scoreA;
+                                  });
+                                
+                                  sortedAlternatives.forEach(function(alternative, index) { 
+                              %>
+                                <tr>
+                                  <td><%= alternative %></td>
+                                  <td>
+                                    <% 
+                                      let score = 'N/A';
+                                      if (decision.results[alternative]) {
+                                        if (typeof decision.results[alternative] === 'object' && decision.results[alternative].score !== undefined) {
+                                          const numScore = Number(decision.results[alternative].score);
+                                          if (!isNaN(numScore)) {
+                                            score = numScore.toFixed(2);
+                                          } else {
+                                            score = String(decision.results[alternative].score);
+                                          }
+                                        } else if (typeof decision.results[alternative] === 'number') {
+                                          score = decision.results[alternative].toFixed(2);
+                                        } else {
+                                          score = String(decision.results[alternative]);
+                                        }
+                                      }
+                                    %>
+                                    <%= score %>
+                                  </td>
+                                  <td>
+                                    <% 
+                                      let rank = index + 1;
+                                      if (decision.results[alternative] && typeof decision.results[alternative] === 'object' && decision.results[alternative].rank) {
+                                        rank = decision.results[alternative].rank;
+                                      }
+                                    %>
+                                    <%= rank %>
+                                  </td>
+                                </tr>
+                              <% 
+                                  }); 
+                                } else {
+                              %>
+                                <tr>
+                                  <td colspan="3" class="text-center">No results available</td>
+                                </tr>
+                              <%
+                                }
+                              } catch (error) { 
+                              %>
+                                <tr>
+                                  <td colspan="3" class="text-center text-danger">Error displaying results: <%= error.message %></td>
+                                </tr>
+                              <% } %>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
           
-          <script>
-            document.addEventListener('DOMContentLoaded', function() {
-              const ctx = document.getElementById('resultsChart').getContext('2d');
-              
-              // Prepare data for chart
-              const labels = [];
-              const data = [];
-              const backgroundColors = [
-                'rgba(54, 162, 235, 0.7)',
-                'rgba(255, 99, 132, 0.7)',
-                'rgba(255, 206, 86, 0.7)',
-                'rgba(75, 192, 192, 0.7)',
-                'rgba(153, 102, 255, 0.7)',
-                'rgba(255, 159, 64, 0.7)',
-                'rgba(199, 199, 199, 0.7)'
-              ];
-              
-              <% sortedAlternatives.forEach(function(alternative, index) { %>
-                labels.push('<%= alternative %>');
-                data.push(<%= decision.results[alternative] %>);
-              <% }); %>
-              
-              // Create chart
-              new Chart(ctx, {
-                type: 'bar',
-                data: {
-                  labels: labels,
-                  datasets: [{
-                    label: 'Score',
-                    data: data,
-                    backgroundColor: backgroundColors.slice(0, labels.length),
-                    borderColor: backgroundColors.slice(0, labels.length).map(color => color.replace('0.7', '1')),
-                    borderWidth: 1
-                  }]
-                },
-                options: {
-                  responsive: true,
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      title: {
-                        display: true,
-                        text: 'Score'
-                      }
-                    },
-                    x: {
-                      title: {
-                        display: true,
-                        text: 'Alternative'
-                      }
-                    }
-                  },
-                  plugins: {
-                    title: {
-                      display: true,
-                      text: 'Decision Results',
-                      font: {
-                        size: 16
-                      }
-                    },
-                    legend: {
-                      display: false
-                    }
-                  }
-                }
-              });
-            });
-          </script>
-        <% } %>
+          <!-- Weight Adjustment Section -->
+          <div class="row mb-4">
+            <div class="col-md-12">
+              <div class="card">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                  <h4 class="mb-0">Adjust Criteria Weights</h4>
+                  <button type="button" class="btn btn-primary btn-sm" id="recalculate-btn">
+                    <i class="fas fa-calculator"></i> Recalculate Results
+                  </button>
+                </div>
+                <div class="card-body">
+                  <div id="weightSliders">
+                    <% decision.criteria.forEach(function(criterion) { %>
+                      <div class="mb-3">
+                        <label for="weight-<%= criterion %>" class="form-label"><%= criterion %></label>
+                        <div class="d-flex align-items-center">
+                          <% let weightValue = 0; %>
+                          <% if (decision.weights && decision.weights[criterion] !== undefined) { %>
+                            <% weightValue = typeof decision.weights[criterion] === 'number' ? 
+                               Math.round(decision.weights[criterion]) : 
+                               (decision.weights[criterion] <= 1 ? Math.round(decision.weights[criterion] * 100) : Math.round(Number(decision.weights[criterion]))); %>
+                          <% } %>
+                          <input type="range" class="form-range me-2" id="weight-<%= criterion %>" name="weight-<%= criterion %>" 
+                                min="0" max="100" value="<%= weightValue %>" 
+                                data-criterion="<%= criterion %>">
+                          <span class="badge bg-primary weight-value" id="weight-value-<%= criterion.replace(/\s+/g, '-') %>"><%= weightValue %>%</span>
+                        </div>
+                      </div>
+                    <% }); %>
+                    
+                    <!-- Total Weight Indicator -->
+                    <div class="alert alert-info mt-3">
+                      <div id="total-weight-text">Total weight: 0%</div>
+                      <div class="progress mt-2">
+                        <div id="total-weight-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Decision Details Section -->
+          <div class="row mb-4">
+            <div class="col-md-12">
+              <div class="card">
+                <div class="card-header bg-light">
+                  <h4 class="mb-0">Decision Details</h4>
+                </div>
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col-md-6">
+                      <h5>Criteria and Weights</h5>
+                      <% if (decision.participants && decision.participants.weights && decision.participants.weights.some(p => p.completed)) { %>
+                        <div class="alert alert-success py-1 px-2 mb-2 small">
+                          <i class="fas fa-info-circle me-1"></i> These weights include participant input
+                        </div>
+                      <% } %>
+                      <ul class="list-group mb-4" id="criteria-weights-list">
+                        <% decision.criteria.forEach(function(criterion) { %>
+                          <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <%= criterion %>
+                            <% 
+                              let detailWeightValue = 0;
+                              if (decision.weights && decision.weights[criterion] !== undefined) {
+                                // Convert any scale to percentage (0-100)
+                                const rawWeight = decision.weights[criterion];
+                                if (rawWeight >= 0 && rawWeight <= 1) {
+                                  // Convert decimal (0-1) to percentage
+                                  detailWeightValue = Math.round(rawWeight * 100);
+                                } else if (rawWeight >= 1 && rawWeight <= 10 && decision.criteria.length > 1) {
+                                  // Convert old scale (1-10) to percentage if multiple criteria exist
+                                  detailWeightValue = Math.round((rawWeight / 10) * 100);
+                                } else {
+                                  // Assume it's already a percentage or handle other scales
+                                  detailWeightValue = Math.round(Number(rawWeight));
+                                }
+                              } else {
+                                // Default weight: equal distribution
+                                detailWeightValue = Math.round(100 / decision.criteria.length);
+                              }
+                              
+                              // Determine if this weight has participant input
+                              const hasParticipantInput = decision.participants && 
+                                                         decision.participants.weights && 
+                                                         decision.participants.weights.some(p => p.completed && p.data && p.data[criterion] !== undefined);
+                            %>
+                            <span class="badge <%= hasParticipantInput ? 'bg-success' : 'bg-primary' %> rounded-pill">
+                              Weight: <%= detailWeightValue %>%
+                              <% if (hasParticipantInput) { %>
+                                <i class="fas fa-users ms-1" title="Includes participant input"></i>
+                              <% } %>
+                            </span>
+                          </li>
+                        <% }); %>
+                      </ul>
+                    </div>
+                    <div class="col-md-6">
+                      <h5>Alternatives</h5>
+                      <ul class="list-group" id="alternatives-list">
+                        <% decision.alternatives.forEach(function(alternative) { %>
+                          <li class="list-group-item"><%= alternative %></li>
+                        <% }); %>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Action Buttons -->
+          <div class="row mb-4">
+            <div class="col-md-12 text-center">
+              <div class="d-inline-flex gap-2 justify-content-center">
+                <% if (typeof isAuthenticated !== 'undefined' && isAuthenticated && !decision.userId) { %>
+                  <!-- Show save to account button for guest users who are now logged in -->
+                  <button id="save-to-account-btn" class="btn btn-success btn-lg me-2">
+                    <i class="fas fa-save me-2"></i> Save To My Account
+                  </button>
+                <% } else if (typeof isAuthenticated !== 'undefined' && !isAuthenticated) { %>
+                  <!-- Show login prompt for guest users -->
+                  <div class="alert alert-info mb-0 me-3">
+                    <i class="fas fa-info-circle me-2"></i> <a href="/login">Log in</a> or <a href="/register">register</a> to save this decision to your account.
+                  </div>
+                <% } %>
+                <a href="/" class="btn btn-primary btn-lg">
+                  <i class="fas fa-plus me-2"></i> Start New Decision
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-</div> 
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    try {
+      // Set up weight slider display updates
+      const rangeInputs = document.querySelectorAll('input[type="range"]');
+      
+      // Function to update the total weight display
+      function updateTotalWeightDisplay() {
+        let totalWeight = 0;
+        rangeInputs.forEach(input => {
+          totalWeight += parseInt(input.value, 10) || 0;
+        });
+        
+        const totalWeightText = document.getElementById('total-weight-text');
+        const progressBar = document.getElementById('total-weight-progress');
+        
+        if (totalWeightText && progressBar) {
+          totalWeightText.textContent = `Total weight: ${Math.round(totalWeight)}%`;
+          
+          // Update progress bar
+          const progressWidth = Math.min(totalWeight, 100);
+          progressBar.style.width = `${progressWidth}%`;
+          
+          // Set color based on how close to 100% we are
+          if (totalWeight === 100) {
+            progressBar.className = 'progress-bar bg-success';
+            totalWeightText.className = 'text-success';
+          } else if (totalWeight > 90 && totalWeight < 110) {
+            progressBar.className = 'progress-bar bg-warning';
+            totalWeightText.className = 'text-warning';
+          } else {
+            progressBar.className = 'progress-bar bg-danger';
+            totalWeightText.className = 'text-danger';
+          }
+        }
+      }
+      
+      rangeInputs.forEach(input => {
+        const criterion = input.dataset.criterion;
+        const valueDisplay = document.getElementById(`weight-value-${criterion.replace(/\s+/g, '-')}`);
+        
+        if (valueDisplay) {
+          input.addEventListener('input', function() {
+            valueDisplay.textContent = this.value + '%';
+            updateTotalWeightDisplay();
+          });
+        }
+      });
+      
+      // Initialize the total weight display
+      updateTotalWeightDisplay();
+      
+      // Chart rendering
+      const ctx = document.getElementById('resultsChart');
+      if (!ctx) {
+        console.error("Chart canvas element not found");
+        return;
+      }
+      
+      const labels = [];
+      const data = [];
+      const backgroundColors = [
+        'rgba(54, 162, 235, 0.7)',
+        'rgba(255, 99, 132, 0.7)',
+        'rgba(255, 206, 86, 0.7)',
+        'rgba(75, 192, 192, 0.7)',
+        'rgba(153, 102, 255, 0.7)',
+        'rgba(255, 159, 64, 0.7)',
+        'rgba(199, 199, 199, 0.7)'
+      ];
+      
+      // Get the alternatives and results data directly 
+      let alternatives = [];
+      let results = {};
+      
+      try {
+        alternatives = JSON.parse('<%- JSON.stringify(decision.alternatives || []) %>');
+        results = JSON.parse('<%- JSON.stringify(decision.results || {}) %>');
+        
+        // Create a combined list of alternatives from both sources
+        const combinedAlternatives = [...new Set([
+          ...alternatives,
+          ...Object.keys(results || {})
+        ])];
+        
+        alternatives = combinedAlternatives;
+      } catch (error) {
+        console.error("Error parsing decision data:", error);
+        ctx.parentElement.innerHTML = '<div class="alert alert-danger">Error parsing decision data: ' + error.message + '</div>';
+        return;
+      }
+      
+      if (!alternatives || alternatives.length === 0) {
+        console.warn("No alternatives found for chart");
+        ctx.parentElement.innerHTML = '<div class="alert alert-warning">No alternatives available to display chart</div>';
+        return;
+      }
+      
+      // Create a list of alternatives and sort by score
+      const chartSortedAlternatives = [...alternatives].sort((a, b) => {
+        let scoreA = 0;
+        let scoreB = 0;
+        
+        // Get score A
+        if (results && results[a]) {
+          if (typeof results[a] === 'object' && results[a].score !== undefined) {
+            scoreA = Number(results[a].score) || 0;
+          } else if (typeof results[a] === 'number') {
+            scoreA = results[a];
+          }
+        }
+        
+        // Get score B
+        if (results && results[b]) {
+          if (typeof results[b] === 'object' && results[b].score !== undefined) {
+            scoreB = Number(results[b].score) || 0;
+          } else if (typeof results[b] === 'number') {
+            scoreB = results[b];
+          }
+        }
+        
+        // Sort highest score first
+        return scoreB - scoreA;
+      });
+      
+      // Create chart data
+      chartSortedAlternatives.forEach(function(alternative) {
+        // Add alternative to labels
+        labels.push(alternative);
+        
+        // Get score for alternative
+        let score = 0;
+        if (results && results[alternative]) {
+          if (typeof results[alternative] === 'object' && results[alternative].score !== undefined) {
+            score = Number(results[alternative].score) || 0;
+          } else if (typeof results[alternative] === 'number') {
+            score = results[alternative];
+          }
+        }
+        
+        // Add score to data
+        data.push(score);
+      });
+      
+      if (labels.length === 0) {
+        ctx.parentElement.innerHTML = '<div class="alert alert-warning">No data available to display chart</div>';
+        return;
+      }
+      
+      // Create chart
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Score',
+            data: data,
+            backgroundColor: backgroundColors.slice(0, labels.length),
+            borderColor: backgroundColors.slice(0, labels.length).map(color => color.replace('0.7', '1')),
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Score'
+              },
+              suggestedMax: 10
+            },
+            x: {
+              title: {
+                display: true,
+                text: 'Alternatives'
+              }
+            }
+          },
+          plugins: {
+            title: {
+              display: true,
+              text: 'Decision Results'
+            },
+            legend: {
+              display: false
+            }
+          }
+        }
+      });
+
+      // Handle recalculation
+      const recalculateBtn = document.getElementById('recalculate-btn');
+      if (recalculateBtn) {
+        recalculateBtn.addEventListener('click', async function() {
+          try {
+            // Collect updated weights
+            const updatedWeights = {};
+            let totalWeight = 0;
+            
+            rangeInputs.forEach(input => {
+              const criterion = input.dataset.criterion;
+              const weight = parseInt(input.value, 10);
+              updatedWeights[criterion] = weight;
+              totalWeight += weight;
+            });
+            
+            // Optional: normalize to ensure weights sum to 100%
+            if (totalWeight !== 100 && totalWeight > 0) {
+              for (const criterion in updatedWeights) {
+                updatedWeights[criterion] = (updatedWeights[criterion] / totalWeight) * 100;
+              }
+            }
+
+            // Show loading indicator
+            recalculateBtn.innerHTML = '<i class="fas fa-spin fa-spinner"></i> Recalculating...';
+            recalculateBtn.disabled = true;
+
+            // Save updated decision with new weights
+            const response = await fetch('/save-to-account', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                decisionId: '<%= decision.id %>',
+                name: '<%= decision.name %>',
+                criteria: JSON.parse('<%- JSON.stringify(decision.criteria || []) %>'),
+                weights: updatedWeights,
+                alternatives: JSON.parse('<%- JSON.stringify(decision.alternatives || []) %>'),
+                evaluations: JSON.parse('<%- JSON.stringify(decision.evaluations || {}) %>'),
+                results: JSON.parse('<%- JSON.stringify(decision.results || {}) %>')
+              })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+              // Reload the page to show updated results
+              window.location.reload();
+            } else {
+              throw new Error(result.error || 'Failed to update decision');
+            }
+          } catch (error) {
+            console.error("Error recalculating results:", error);
+            alert('Error recalculating results: ' + error.message);
+            
+            // Reset button
+            recalculateBtn.innerHTML = '<i class="fas fa-calculator"></i> Recalculate Results';
+            recalculateBtn.disabled = false;
+          }
+        });
+      }
+
+      // Collapsible box functionality
+      const collaborationBox = document.getElementById('collaborationOptions');
+      const collapseIcon = document.getElementById('collapseIcon');
+      const collapseToggle = document.querySelector('[data-bs-toggle="collapse"][href="#collaborationOptions"]');
+      
+      // Check if we have a saved state
+      const savedState = localStorage.getItem('collaborationBoxCollapsed-<%= decision.id %>');
+      
+      // If we have a saved state, apply it
+      if (savedState === 'true') {
+        collaborationBox.classList.remove('show');
+        collapseIcon.classList.remove('fa-chevron-down');
+        collapseIcon.classList.add('fa-chevron-up');
+      }
+      
+      // Add event listener to save state
+      collaborationBox.addEventListener('hidden.bs.collapse', function () {
+        localStorage.setItem('collaborationBoxCollapsed-<%= decision.id %>', 'true');
+        collapseIcon.classList.remove('fa-chevron-down');
+        collapseIcon.classList.add('fa-chevron-up');
+      });
+      
+      collaborationBox.addEventListener('shown.bs.collapse', function () {
+        localStorage.setItem('collaborationBoxCollapsed-<%= decision.id %>', 'false');
+        collapseIcon.classList.remove('fa-chevron-up');
+        collapseIcon.classList.add('fa-chevron-down');
+      });
+    } catch (error) {
+      console.error("Error in decision view:", error);
+    }
+  });
+</script> 
