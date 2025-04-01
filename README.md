@@ -1,109 +1,122 @@
-# ThinkFlow - AI-Powered Decision Making Platform
+# Decision Matrix App
 
-ThinkFlow is a modern web application that helps teams make better decisions using AI-powered guidance. The platform combines structured decision-making frameworks with artificial intelligence to provide intelligent suggestions for criteria, alternatives, and weights.
+A web application to help users make decisions using a weighted decision matrix approach.
+
+## Overview
+
+The Decision Matrix App guides users through a structured decision-making process:
+
+1. **Name Your Decision**: Define what decision you're trying to make
+2. **Define Criteria**: Identify the factors important to your decision
+3. **Set Weights**: Assign importance to each criterion (1-10)
+4. **Add Alternatives**: List the options you're considering
+5. **Evaluate Alternatives**: Rate each alternative against each criterion
+6. **View Results**: See a calculated score for each alternative
 
 ## Features
 
-- 🤖 AI-powered decision assistance
-- 👥 Collaborative decision making
-- 📊 Interactive scoring system
-- 📈 Visual results and analytics
-- 🔒 Secure authentication
-- 🌐 Public sharing options
+- Step-by-step guided decision process
+- Persistent storage of decisions using SQLite database
+- Client-side state management with localStorage backup
+- Responsive design using Bootstrap
+- Interactive charts for visualizing results
+- Form validation and error handling
 
-## Tech Stack
+## Technical Stack
 
-- Frontend: React.js with Material-UI
-- Backend: Node.js with Express
-- Database: PostgreSQL
-- AI Integration: OpenAI API
-- Authentication: JWT
+- **Backend**: Node.js with Express
+- **Database**: SQLite with Sequelize ORM
+- **Frontend**: HTML, CSS, JavaScript
+- **Templating**: EJS
+- **Styling**: Bootstrap 5
+- **Charts**: Chart.js
 
-## Prerequisites
-
-- Node.js (v14 or higher)
-- PostgreSQL
-- OpenAI API key
-
-## Environment Setup
+## Installation
 
 1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/thinkflow.git
-cd thinkflow
-```
+   ```
+   git clone <repository-url>
+   cd decision-matrix-app
+   ```
 
 2. Install dependencies:
-```bash
-# Install backend dependencies
-cd thinkflow2.0/server
-npm install
+   ```
+   npm install
+   ```
 
-# Install frontend dependencies
-cd ../client
-npm install
-```
+3. Start the application:
+   ```
+   node app.js
+   ```
 
-3. Set up environment variables:
-
-Create `.env` files in both client and server directories:
-
-Server `.env`:
-```env
-PORT=5001
-DB_HOST=localhost
-DB_USER=your_db_user
-DB_PASSWORD=your_db_password
-DB_NAME=thinkflow
-JWT_SECRET=your_jwt_secret
-OPENAI_API_KEY=your_openai_api_key
-CLIENT_URL=http://localhost:3000
-```
-
-Client `.env`:
-```env
-REACT_APP_API_URL=http://localhost:5001
-REACT_APP_CLIENT_URL=http://localhost:3000
-```
-
-## Running the Application
-
-1. Start the backend server:
-```bash
-cd thinkflow2.0/server
-npm start
-```
-
-2. Start the frontend development server:
-```bash
-cd thinkflow2.0/client
-npm start
-```
-
-The application will be available at:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:5001
+4. Open your browser and navigate to:
+   ```
+   http://localhost:3333
+   ```
 
 ## Development
 
-- Frontend code is in `thinkflow2.0/client/src`
-- Backend code is in `thinkflow2.0/server/src`
-- API documentation is available at `/api/docs` when running the server
+### Project Structure
 
-## Contributing
+- `app.js` - Main application file
+- `models/` - Database models
+- `services/` - Business logic
+- `utils/` - Utility functions
+- `views/` - EJS templates
+- `public/` - Static assets
+  - `css/` - Stylesheets
+  - `js/` - Client-side JavaScript
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+### Database
+
+The application uses SQLite for data persistence. The database schema is defined in `models/index.js`.
+
+## Deployment
+
+This application can be deployed to various cloud platforms. Here are the steps for deploying to Render:
+
+1. Create a Render account at https://render.com
+2. Click "New +" and select "Web Service"
+3. Connect your GitHub repository
+4. Configure the deployment:
+   - Name: decision-matrix-app
+   - Environment: Node
+   - Build Command: `npm install`
+   - Start Command: `node app.js`
+   - Plan: Free
+
+Environment Variables:
+- `NODE_ENV`: production
+- `PORT`: 3000 (or let Render assign one)
+- `SESSION_SECRET`: your-secret-key (replace with a secure random string)
+
+The application uses SQLite by default, which is fine for development but for production, consider using:
+- PostgreSQL for the database
+- Redis for session storage
+
+## Production Considerations
+
+1. Database: The app currently uses SQLite. For production, consider migrating to PostgreSQL:
+   - Create a PostgreSQL database on Render
+   - Update database configuration to use PostgreSQL
+   - Migrate your data
+
+2. Session Management:
+   - Use a production-ready session store
+   - Set secure session cookies
+   - Use HTTPS
+
+3. Security:
+   - Enable CORS if needed
+   - Set secure headers
+   - Rate limiting for API endpoints
+   - Regular security updates
+
+4. Monitoring:
+   - Set up error tracking (e.g., Sentry)
+   - Monitor application performance
+   - Set up logging
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- OpenAI for providing the AI capabilities
-- Material-UI for the beautiful components
-- All contributors who have helped shape this project 
+ISC 
